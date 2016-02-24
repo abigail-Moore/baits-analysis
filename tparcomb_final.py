@@ -4,6 +4,9 @@
 #This script takes the results of tparcomb_combiner.py and deals with the loci that had
 #multiple sequences for the same paralog for some individuals.
 #Once it has fixed these loci, it makes final versions of two information files.
+#version 1.1 23 Feb. 2016
+#modified so that it aligns the sequences and makes trees in order from largest to smallest sequence file
+#**************This has not been tested!!********************
 
 #format of RedoList.txt (has a header line, starting with "Locus" that provides no useful information)
 '''
@@ -418,7 +421,9 @@ HeaderDDPrinting(ISIDict, "Locus", "Paralog", IndList, OutFolder+OutFilePre+"Ind
 HeaderDDPrinting(IPDict, "Locus", "Paralog", IndList, OutFolder+OutFilePre+"Seqs_per_Paralog.txt")
 
 #making new sequence files with all sequences that are over 100bp
+OutLocusDict = defaultdict(list)
 for Locus in ISIDict:
+	NumSeqs = 0
 	if Locus in NewSeqDict.keys():
 		InFileName = OutFolder+OutFilePre+Locus+"_allseqs.fa"
 	else:
@@ -427,10 +432,12 @@ for Locus in ISIDict:
 	InFile = open(InFileName, 'rU')
 	OutFile = open(OutFileName, 'w')
 	for record in SeqIO.parse(InFile, "fasta"):
+		NumSeqs += 1
 		if len(str(record.seq).replace("-","")) > 100:
 			SeqIO.write(record, OutFile, "fasta")
 	InFile.close()
 	OutFile.close()
+	OutLocusDict[NumSeqs].append(Locus)
 print("%d sequence files that only contain the sequences that are longer than 100 bp were written, with names such as %s.\n" % (len(ISIDict.keys()), OutFileName))
 sys.stderr.write("%d sequence files that only contain the sequences that are longer than 100 bp were written, with names such as %s.\n" % (len(ISIDict.keys()), OutFileName))
 
@@ -487,13 +494,18 @@ for Line in InFile:
 		LPDict[Locus].append(Paralog)
 InFile.close()
 
+OutLocusList = [ ]
+for NumSeqs in sorted(OutLocusDict.keys(), reverse=True):
+	if NumSeqs != 0:
+		OutLocusList += OutLocusDict[NumSeqs]
+
 OutList1 = ['#! /bin/bash\n']
 OutFileName1 = OutFolder+OutFilePre+"Locus_Analysis_Subscript1.sh"
 OutList2 = ['#! /bin/bash\n']
 OutFileName2 = OutFolder+OutFilePre+"Locus_Analysis_Subscript2.sh"
 OutList3 = ['#! /bin/bash\n']
 OutFileName3 = OutFolder+OutFilePre+"Locus_Analysis_Script.sh"
-for Locus in LPDict:
+for Locus in OutLocusList:
 	#if we don't need to add any new sequences to that locus
 	if (Locus in RedoneDict.keys()) == False:
 		Line = 'cp '+InFolder+InFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_allbest_al.fa "
@@ -527,17 +539,18 @@ for Locus in LPDict:
 				else:
 					Line = "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Paralog+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+Paralog+"_al.fa\n"
 					OutList1.append(Line)
-	Line = "raxmlHPC -s "+OutFolder+OutFilePre+Locus+"_allbest_al.phy -n "+OutFilePre+"ab_"+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
-	Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+"_allseqs_al.phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
-	Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+"_allover100_al.phy -n "+OutFilePre+"o100_"+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+	#These trees are just going to be used to classify the various paralogs, so I do not need to have bootstrap values
+	Line = "raxmlHPC  -f d -s "+OutFolder+OutFilePre+Locus+"_allbest_al.phy -n "+OutFilePre+"ab_"+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+	#Line += "raxmlHPC -f d -s "+OutFolder+OutFilePre+Locus+"_allseqs_al.phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+	Line += "raxmlHPC -f d -s "+OutFolder+OutFilePre+Locus+"_allover100_al.phy -n "+OutFilePre+"o100_"+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
 	OutList2.append(Line)
 OutFileWriting(OutFileName1, OutList1)
 Line = "chmod u+x "+OutFileName1+"\n"
-Line += "cat "+OutFileName1+" | parallel --jobs "+NCores+" --progress\n"
+Line += "cat "+OutFileName1+" | parallel --jobs "+NCores+" --joblog "+OutFolder+OutFilePre+"parallel_log1.log\n"
 OutList3.append(Line)
 OutFileWriting(OutFileName2, OutList2)
 Line = "chmod u+x "+OutFileName2+"\n"
-Line += "cat "+OutFileName2+" | parallel --jobs "+NCores+" --progress\n"
+Line += "cat "+OutFileName2+" | parallel --jobs "+NCores+" --joblog "+OutFolder+OutFilePre+"parallel_log2.log\n"
 OutList3.append(Line)
 OutFileWriting(OutFileName3, OutList3)
 print("The shell script for the sequences was written to %s.\n" % (OutFileName3))

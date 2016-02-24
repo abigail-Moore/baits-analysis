@@ -17,7 +17,9 @@ tparcomb_combiner.py
 tparcomb_final.py
 tambig_seq_renaming.py
 
-indirectly: fastq_to_phylip.py
+indirectly:
+fastq_to_phylip.py
+treerenamer.py
 mafft
 raxml
 '''
@@ -101,6 +103,8 @@ if AlFilePost == "none":
 NCores = sys.argv[19]
 NRounds = int(sys.argv[20])
 
+################################################################################
+
 #NoneDictFromFile makes a dictionary from a tab-delimited file, where the first
 #column is the key and the second is the value, but if the value is "none",
 #then the value is ""
@@ -145,6 +149,8 @@ def OutFileWriting(FileName, MyList):
 	OutFile.close()
 	print("Output file %s written.\n" % (FileName))
 	sys.stderr.write("Output file %s written.\n" % (FileName))
+
+###################################################################################
 
 GroupDict = NoneDictFromFile(GroupListFileName)
 PolyList = CaptureColumn(PolyListFileName, 0)
@@ -221,7 +227,7 @@ for RoundNum in range(1,NRounds+1):
 		OutScriptGroup.append(Line)
 		OutFileWriting(OutScriptGroupName, OutScriptGroup)
 	OutFileWriting(GroupFileListName, GroupFileList)
-	Line = "cat "+GroupFileListName+" | parallel --jobs "+NCores+" --progress\n"
+	Line = "cat "+GroupFileListName+" | parallel --jobs "+NCores+" --joblog "+OutFolder+OutFilePre+"parallel_log_round"+str(RoundNum)+".log\n"
 	OutScript.append(Line)
 	##Combining everything:
 	#*****tparalog_combiner.py
@@ -266,8 +272,6 @@ OutScript.append(Line)
 Line = "chmod u+x "+OutFolder+OutFilePre+"_final/"+OutFilePre+"fi_Locus_Analysis_Script.sh\n"
 Line += OutFolder+OutFilePre+"_final/"+OutFilePre+"fi_Locus_Analysis_Script.sh\n"
 OutScript.append(Line)
-Line = "mkdir "+OutFolder+OutFilePre+"_final2\n"
-OutScript.append(Line)
 
 OutFileName = OutFolder+OutFilePre+"_contig_classification_script.sh"
 OutFileWriting(OutFileName, OutScript)
@@ -275,8 +279,9 @@ OutFileWriting(OutFileName, OutScript)
 #making the script to reclassify the ambiguous paralogs, if necessary
 OutScript2 = [ ]
 Line = "#! /bin/bash\n#SBATCH -J "+OutFilePre+"\n#SBATCH -t 4:00:00\n#SBATCH -n "+NCores+"\n#SBATCH --mem="+str(int(NCores)*4)+"G\n"
-Line += "date >> "+OutFolder+Date+"_"+OutFilePre+".log\nmodule load mafft\n"
+Line += "date >> "+OutFolder+Date+"_"+OutFilePre+".log\nmodule load mafft\nmodule load raxml\n"
 OutScript2.append(Line)
+Line = "mkdir "+OutFolder+OutFilePre+"_final2\n"
 Line = ScriptFolder+"tambig_seq_renaming.py "+OutFolder+OutFilePre+"_final/ "+OutFilePre+"fi_ "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ "+OutFolder+OutFilePre+"_combined/ "+OutFilePre+"cb_ "+OutFolder+OutFilePre+"_final2/ "+OutFilePre+"fi2_ "+ScriptFolder2+" "+OGFileName+" "+IndListFileName+" "+NCores+" "+OutFolder+OutFilePre+"_combined/"+OutFilePre+"cb_Ambig_Paralog_List.txt >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
 Line += "chmod u+x "+OutFolder+OutFilePre+"_final2/"+OutFilePre+"fi2_seq_renaming_script1.sh\n"
 Line += OutFolder+OutFilePre+"_final2/"+OutFilePre+"fi2_seq_renaming_script1.sh\n"

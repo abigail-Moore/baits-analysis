@@ -40,6 +40,7 @@ according to paralog and adds them to the user-chosen paralogs.
 
 '''
 tambig_seq_renaming.py InFolder InFilePre CFolder CFilePre CBFolder CBFilePre OutFolder OutFilePre ScriptPath OutGroupDictFN IndDictFileName NCores NPFileName
+/gpfs/scratch/ajm3/eedwards/scripts/tambig_seq_renaming.py /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_final/ Ln1tfi_ /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_contigsplit/ Ln1tcs_ /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_combined/ Ln1tcb_ /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_final2/ Ln1tfi2_ /gpfs/scratch/ajm3/eedwards/scripts/ /gpfs/scratch/ajm3/eedwards/general/outgroup_list_new.txt /gpfs/scratch/ajm3/eedwards/general/Ln1_inds2.txt 8 /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_combined/Ln1tcb_Ambig_Paralog_List.txt
 '''
 
 print("%s\n" % (" ".join(sys.argv)))
@@ -246,9 +247,9 @@ if (InFolder == OutFolder) and (InFilePre == OutFilePre):
 	os.popen(OutLine,'r')
 	OutLine = "mv "+InFolder+InFilePre+"Seqs_per_Paralog.txt "+InFolder+InFilePre+"Seqs_per_Paralog_old.txt"
 	os.popen(OutLine,'r')
-	OutLine = "mv "+CFolder+CFilePre+"Seqs_per_Paralog.txt "+CFolder+CFilePre+"Seqs_per_Paralog_old.txt"
-	os.popen(OutLine,'r')
 	OutLine = "mv "+InFolder+InFilePre+"pardict.txt "+InFolder+InFilePre+"pardict_old.txt"
+OutLine = "mv "+CFolder+CFilePre+"Seqs_per_Paralog.txt "+CFolder+CFilePre+"Seqs_per_Paralog_old.txt"
+os.popen(OutLine,'r')
 
 #Things that need to be done:
 #check to see if there is already a sequence from that paralog for that individual
@@ -257,11 +258,11 @@ if (InFolder == OutFolder) and (InFilePre == OutFilePre):
 #rename NewPar to NewPar_old.fa
 #move the sequences from the OldPar to the NewPar files (probably best to align the new sequences to the (old) NewPar instead of aligning everything)
 #make a file with the old sequence name[tab]new sequence name to
-#rename allbest_al.fa, allbest_al.phy, newseqs.fa, allseqs_al.fa, allseqs_al.phy, RAxML_bipartitions..._ab_ and RAxML_bipartitions..._
-#probably copy at least the .fa and the RAxML files to filename_old.extension, so that I can see what happened.
-#or maybe forget about the .phy files entirely, because I don't really need those, anyway
+#rename allbest_al.fa, allover100_al.fa, allseqs_al.fa, RAxML_bestTree..._ab_ and RAxML_bestTree..._o100
+#copy at least .fa and the RAxML files to filename_old.extension, so that I can see what happened (if InFolder and OutFolder are the same)
 #update the ISIDict and IPDict by removing the old paralog (if everything has been classified) and adding entries to the new paralog.
 
+RenamedLocusList = [ ]
 ParFateDict = defaultdict(dict)
 NewParDict = defaultdict(list)
 for Locus in NPDict:
@@ -307,7 +308,7 @@ for Locus in NPDict:
 				if ContigIndDict[Ind] == 1:
 					for OldSeqName in OldParIndDict[Ind]:
 						#adding the sequence to the dictionary of NewPar sequences
-						NewSeqName = OldSeqName.split(OldPar)[0]+"_"+NewPar
+						NewSeqName = OldSeqName.split(OldPar)[0]+NewPar
 						NewParSeqDict[NewSeqName] = OldParSeqDict[OldSeqName]
 						LocusRenamingList.append(OldSeqName+"\t"+NewSeqName+"\n")
 						#removing it from the dictionary of OldPar sequences
@@ -360,21 +361,20 @@ for Locus in NPDict:
 							PDDict[Locus][NewPar] = defaultdict(dict)
 							PDDict[Locus][NewPar][NewSeqName] = Genus
 			#write the sequences for the new paralog
-			OutLine = "mv "+InFolder+InFilePre+Locus+"_"+NewPar+"_al.fa "+InFolder+InFilePre+Locus+"_"+NewPar+"_old_al.fa"
-			os.popen(OutLine,'r')
-			print(OutFolder+OutFilePre+Locus)
-			SeqFileWriting(OutFolder+OutFilePre+Locus+"_"+NewPar+"_new.fa", NewParSeqDict, "fasta")
-		#check to see if there are any OldPar sequence left.  If not, just rename the OldPar file, if so, then write a new OldPar file.
+			SeqFileWriting(OutFolder+OutFilePre+Locus+"_"+NewPar+".fa", NewParSeqDict, "fasta")
+		#check to see if there are any OldPar sequence left.  If so, then write a new OldPar file.
 		#if all of the sequences from OldPar were classified
 		if OldParSeqDict == { }:
 			ParFateDict[Locus][OldPar] = "no seqs remaining"
 		#if not,
 		else:
 			ParFateDict[Locus][OldPar] = str(len(OldParSeqDict))+" seqs remaining"
-			SeqFileWriting(InFolder+InFilePre+Locus+"_"+OldPar+".fa", OldParSeqDict, "fasta")
+			SeqFileWriting(OutFolder+OutFilePre+Locus+"_"+OldPar+".fa", OldParSeqDict, "fasta")
 	#write the renaming file for the locus
-	LocusRenamingFN = OutFolder+OutFilePre+Locus+"_renaming_key.txt"
-	OutFileWriting(LocusRenamingFN, LocusRenamingList)
+	if LocusRenamingList != [ ]:
+		LocusRenamingFN = OutFolder+OutFilePre+Locus+"_renaming_key.txt"
+		OutFileWriting(LocusRenamingFN, LocusRenamingList)
+		RenamedLocusList.append(Locus)
 
 #writing the information files
 HeaderDDPrinting(ISIDict, "Locus", "Paralog", ISIIndList, OutFolder+OutFilePre+"Ind_Seq_Info.txt")
@@ -392,30 +392,26 @@ OutFileWriting(OutFileName, OutList)
 
 
 #writing the scripts to move the files and to align the new paralog files:
-ScriptList1 = ['#! /bin/bash/\n\n']
-ScriptList2 = ['#! /bin/bash/\n\n']
-for Locus in NPDict:
+ScriptList1 = ['#! /bin/bash\n\n']
+for Locus in RenamedLocusList:
 	if (InFolder == OutFolder) and (InFilePre == OutFilePre):
-		Line = "mv "+InFolder+InFilePre+Locus+"allbest_al.fa "+InFolder+InFilePre+Locus+"allbest_al_old.fa\n"
-		Line += "mv "+InFolder+InFilePre+Locus+"new.fa "+InFolder+InFilePre+Locus+"newseqs_old.fa\n"
-		Line += "mv "+InFolder+InFilePre+Locus+"allseqs_al.fa "+InFolder+InFilePre+Locus+"allseqs_al_old.fa\n"
-		Line += "mv "+InFolder+"RAxML_bipartitions."+InFilePre+Locus+" "+InFolder+"RAxML_bipartitions."+InFilePre+Locus+"_old\n"
+		Line = "mv "+InFolder+InFilePre+Locus+"_allbest_al.fa "+InFolder+InFilePre+Locus+"_allbest_al_old.fa\n"
+		Line += "mv "+InFolder+InFilePre+Locus+"_allseqs_al.fa "+InFolder+InFilePre+Locus+"_allseqs_al_old.fa\n"
+		Line += "mv "+InFolder+"RAxML_bipartitions."+InFilePre+"o100_"+Locus+" "+InFolder+"RAxML_bipartitions."+InFilePre+"o100_"+Locus+"_old\n"
 		Line += "mv "+InFolder+"RAxML_bipartitions."+InFilePre+"ab_"+Locus+" "+InFolder+"RAxML_bipartitions."+InFilePre+"ab_"+Locus+"_old\n"
 		ScriptList1.append(Line)
-	Line = ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"allbest_al_old.fa "+OutFolder+OutFilePre+Locus+"allbest_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
-	Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"allseqs_al_old.fa "+OutFolder+OutFilePre+Locus+"allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
-	Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"new.fa "+OutFolder+OutFilePre+Locus+"new.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
-	Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+Locus+"_old "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
-	Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"ab_"+Locus+"_old "+OutFolder+"RAxML_bipartitions."+OutFilePre+"ab_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
-	ScriptList1.append(Line)
-	for NewPar in set(NewParDict[Locus]):
-		#***Note that mafft will need to be loaded by this point***
-		Line = "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+NewPar+"_new.fa --quiet --thread -1 "+InFolder+InFilePre+Locus+"_"+NewPar+"_old_al.fa > "+OutFolder+OutFilePre+Locus+"_"+NewPar+"_al.fa\n"
-		ScriptList2.append(Line)
-OutFileName1 = OutFolder+OutFilePre+"seq_renaming_script1.sh"
-OutFileName2 = OutFolder+OutFilePre+"seq_renaming_script2.sh"
-Line = Line = "chmod u+x "+OutFileName2+"\n"
-Line += "cat "+OutFileName2+" | parallel --jobs "+NCores+" --progress\n"
-ScriptList1.append(Line)
+		Line = ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allbest_al_old.fa "+OutFolder+OutFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allseqs_al_old.fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allover100_al_old.fa "+OutFolder+OutFilePre+Locus+"_allover100_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"o100_"+Locus+"_old "+OutFolder+"RAxML_bipartitions."+OutFilePre+"o100_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"ab_"+Locus+"_old "+OutFolder+"RAxML_bipartitions."+OutFilePre+"ab_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		ScriptList1.append(Line)
+	else:
+		Line = ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allover100_al.fa "+OutFolder+OutFilePre+Locus+"_allover100_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"o100_"+Locus+" "+OutFolder+"RAxML_bipartitions."+OutFilePre+"o100_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"ab_"+Locus+" "+OutFolder+"RAxML_bipartitions."+OutFilePre+"ab_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		ScriptList1.append(Line)
+OutFileName1 = OutFolder+OutFilePre+"seq_renaming_script.sh"
 OutFileWriting(OutFileName1, ScriptList1)
-OutFileWriting(OutFileName2, ScriptList2)

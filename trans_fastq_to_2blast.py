@@ -23,7 +23,7 @@
 #example:
 '''
 trans_fastq_to_2blast.py ~/transcriptomes/TS27_2015_01_26/TS27_2015_01_26_inds/ t1_ ~/transcriptomes/TS27_2015_01_26/TS27_1.csv ~/transcriptomes/TS27_2015_01_26/TS27_2015_01_26_inds/ a1_
-trans_fastq_to_2blast.py InFolder InFilePre BCFileName OutFolder OutFilePre BlastDB BlastFilePre
+trans_fastq_to_2blast.py InFolder InFilePre IndListFileName OutFolder OutFilePre BlastDB BlastFilePre NCores
 '''
 
 Usage = '''
@@ -31,7 +31,7 @@ trans_fastq_to_2blast.py version 1.0
 This script prepares fastq files for blasting.
 trans_fastq_to_blast.py [input folder] [input file prefix] [barcode file] 
 [folder for output files] [output file prefix] [name of blast database]
-[prefix for blast output files]
+[prefix for blast output files] [number of cores for parallelizing blast]
 '''
 
 import sys #We want to be able to get information from the command line
@@ -40,15 +40,16 @@ import gzip #We want to be able to open gzipped files directly.
 
 print ("%s\n" % (" ".join(sys.argv)))
 
-if len(sys.argv) < 8:
-	sys.exit("ERROR!!  This script requires 7 additional arguments, and you supplied %d.\n%s" % (len(sys.argv)-1, Usage))
+if len(sys.argv) < 9:
+	sys.exit("ERROR!!  This script requires 8 additional arguments, and you supplied %d.\n%s" % (len(sys.argv)-1, Usage))
 InFolder = sys.argv[1]
 InFilePre = sys.argv[2]
-BCFileName = sys.argv[3]
+IndListFileName = sys.argv[3]
 OutFolder = sys.argv[4]
 OutFilePre = sys.argv[5]
 BlastDB = sys.argv[6]
 BlastFilePre = sys.argv[7]
+NCores = sys.argv[8]
 
 IndList = [ ] #List of the individuals for which files will be made
 TotalSeqs = 0
@@ -62,13 +63,14 @@ if InFolder[-1:] != "/":
 if OutFolder[-1:] != "/":
 	OutFolder += "/"
 
-#Getting the names of the individuals from the barcodes file
-InFile = open(BCFileName, 'rU')
+#Getting the names of the individuals from the list of individuals
+InFile = open(IndListFileName, 'rU')
 for Line in InFile:
 	Line = Line.strip('\n').strip('\r').split('\t')
-	IndList.append(Line[1])
+	IndList.append(Line[0])
 InFile.close()
 
+OutIndDict = defaultdict(list)
 for IndName in IndList:
 	for Ending in ['_R1','_R2']:
 		SeqDict = { }
@@ -100,6 +102,7 @@ for IndName in IndList:
 			print("%d sequences for the individual %s were written to the file %s.\n" % (IndSeqs, IndName, OutFileName))
 			sys.stderr.write("%d sequences for the individual %s were written to the file %s.\n" % (IndSeqs, IndName, OutFileName))
 			GoodInds += 0.5
+			OutIndDict[IndSeqs].append(IndName)
 		except IOError:
 			try: #Trying to open the non-gzipped file
 				InFileName = InFolder + InFilePre + IndName + Ending + ".fastq"
@@ -129,6 +132,7 @@ for IndName in IndList:
 				print("%d sequences for the individual %s were written to the file %s.\n" % (IndSeqs, IndName, OutFileName))
 				sys.stderr.write("%d sequences for the individual %s were written to the file %s.\n" % (IndSeqs, IndName, OutFileName))
 				GoodInds += 0.5
+				OutIndDict[IndSeqs].append(IndName)
 			except IOError: #If neither the gzipped nor the non-gzipped file exit
 				print("There were no sequences for %s.\n" % (IndName))
 				sys.stderr.write("There were no sequences for %s.\n" % (IndName))
@@ -139,22 +143,33 @@ sys.stderr.write("In total, %d sequences from %d individuals were read from file
 print("%d individuals did not have sequences.\n" % (BadInds))
 sys.stderr.write("%d individuals did not have sequences.\n" % (BadInds))
 
-BlastFileList = [ ]
+OutIndList = [ ]
+for IndSeqs in sorted(OutIndDict.keys(), reverse=True):
+	if IndSeqs != 0:
+		OutIndList += OutIndDict[IndSeqs]
+
+OutScript1 = ["#! /bin/bash\n" ]
+OutScript2 = [ ]
 FastaFileList = [ ]
-Line = "#! /bin/bash\n"
-BlastFileList.append(Line)
-for IndName in IndList:
+for IndName in OutIndList:
 	for Ending in ['_R1', '_R2']:
 		Line = "blastn -db "+BlastDB+" -query "+OutFolder+OutFilePre+IndName+Ending+".fa -out "+OutFolder+BlastFilePre+IndName+Ending+".out -outfmt '6 std qlen slen' -task blastn\n"
-		BlastFileList.append(Line)
+		OutScript2.append(Line)
 		FastaFileList.append(OutFolder+OutFilePre+IndName+Ending+".fa\n")
-OutFileName = OutFolder+BlastFilePre+"blast_script.sh"
-OutFile = open(OutFileName, 'w')
-for Line in BlastFileList:
+OutFileName1 = OutFolder+BlastFilePre+"blast_script1.sh"
+OutFileName2 = OutFolder+BlastFilePre+"blast_script2.sh"
+Line = "cat "+OutFileName2+" | parallel --jobs = "+NCores+" --joblog "+OutFolder+BlastFilePre+"parallel_log.log\n"
+OutFileName1.append(Line)
+OutFile = open(OutFileName1, 'w')
+for Line in OutScript1:
 	OutFile.write(Line)
 OutFile.close()
-print("The script to run blastn on these fasta files was written to %s.\n" % (OutFileName))
-sys.stderr.write("The script to run blastn on these fasta files was written to %s.\n" % (OutFileName))
+OutFile = open(OutFileName2, 'w')
+for Line in OutScript2:
+	OutFile.write(Line)
+OutFile.close()
+print("The script to run blastn on these fasta files was written to %s.\n" % (OutFileName1))
+sys.stderr.write("The script to run blastn on these fasta files was written to %s.\n" % (OutFileName1))
 
 #***This part hasn't been specifically tested***
 OutFileName = OutFolder+OutFilePre+"fasta_file_list.txt"

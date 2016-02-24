@@ -15,7 +15,7 @@ from collections import defaultdict #to make dictionaries with multiple levels
 
 #Example:
 '''
-tbaits_blastn_parse.py InFolderSeq InFolderBl BCFileName LocusFileName AlFilePre BLFilePre OutFolder OutFilePre
+tbaits_blastn_parse.py InFolderSeq InFolderBl IndListFileName LocusFileName AlFilePre BLFilePre OutFolder OutFilePre
 '''
 
 Usage = '''
@@ -35,7 +35,7 @@ if len(sys.argv) != 9:
 else:
 	InFolderSeq = sys.argv[1]
 	InFolderBl = sys.argv[2]
-	BCFileName = sys.argv[3]
+	IndListFileName = sys.argv[3]
 	LocusFileName = sys.argv[4]
 	AlFilePre = sys.argv[5]
 	BLFilePre = sys.argv[6]
@@ -61,11 +61,11 @@ if InFolderBl[-1:] != "/":
 if OutFolder[-1:] != "/":
 	OutFolder += "/"
 
-#Getting the names of the individuals from the barcodes file
-InFile = open(BCFileName, 'rU')
+#Getting the names of the individuals from the list of individuals
+InFile = open(IndListFileName, 'rU')
 for Line in InFile:
 	Line = Line.strip('\n').strip('\r').split('\t')
-	IndList.append(Line[1])
+	IndList.append(Line[0])
 InFile.close()
 IndList = sorted(IndList)
 

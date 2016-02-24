@@ -47,7 +47,7 @@ tnotung_homolog_parsing.py InFolder InFilePre InFilePost AlFolder AlFilePre AlFi
 print("%s\n" % (" ".join(sys.argv)))
 
 if len(sys.argv) != 11:
-	sys.exit("ERROR!  This script requires 10 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
+	sys.exit("ERROR!  This script requires 12 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
 InFolder = sys.argv[1]
 if InFolder[-1] != "/":
 	InFolder += "/"
@@ -81,8 +81,8 @@ OutFilePost = sys.argv[10]
 if OutFilePost == "none":
 	OutFilePost = ""
 
-ShowTrees = True
-Vociferous = True
+ShowTrees = False
+Vociferous = False
 
 #####################################################################################
 
@@ -118,7 +118,7 @@ def CaptureColumn(FileName, ColNum):
 #original
 def GetIndName(NodeName):
 	#for full sequences:
-	if (len(str(NodeName).split(".")) > 3):
+	if (len(str(NodeName).split(".")) > 2):
 		IndNameTemp = str(NodeName).split(".")[0]
 	#for contigs
 	else:
@@ -417,7 +417,6 @@ def ParalogNamer(TempTree, Locus):
 			#if each half of the duplication had a single name:
 			if (len(DictTemp[DupNum][1]['ParNames']) == 1) and (len(DictTemp[DupNum][2]['ParNames']) == 1):
 				#the names can be different
-				#****It is still possible that these names were already used, though*****
 				if len(DupNamesList) == ParNum:
 					for ParNum in DictTemp[DupNum]:
 						NewParName = DictTemp[DupNum][ParNum]['ParNames'][0]
@@ -667,7 +666,6 @@ NewParInfoDict = defaultdict(dict)#NewParInfoDict[Locus][DupName]['SeqNames'/'Pa
 DupPosDict = defaultdict(dict)#DupPosDict[Locus][DupName]['sister'/'daughters'] = list of individuals
 
 for Locus in LocusList:
-	print Locus
 	#reading the tree from Notung (.ntg format)
 	TreeFileName = InFolder+"RAxML_bipartitions."+InFilePre+Locus+InFilePost+".rearrange.0.ntg"
 	LocusTree_orig = NotungFileReading(TreeFileName)
@@ -691,7 +689,8 @@ for Locus in LocusList:
 	SeqDictGF = { }
 	#write new sequence files for each new paralog
 	for DupNode in NewParInfoDict[Locus]:
-		OutFileName = OutFolder+OutFilePre+Locus+"_"+NewParInfoDict[Locus][DupNode]['Name']+OutFilePost+".fa"
+		ParName = NewParInfoDict[Locus][DupNode]['Name']
+		OutFileName = OutFolder+OutFilePre+Locus+"_"+ParName+OutFilePost+".fa"
 		SeqDict = { }
 		for SeqName in NewParInfoDict[Locus][DupNode]['SeqNames']:
 			#first assuming the sequence was an existing sequence
@@ -705,6 +704,7 @@ for Locus in LocusList:
 		SeqFileWriting(OutFileName, SeqDict, 'fasta')
 	SeqFileWriting(OutFileNameGF, SeqDictGF, 'fasta')
 
+##################################################################################
 #writing the output files
 
 #making a new pardict for future analyses
@@ -733,3 +733,22 @@ for Locus in DupPosDict:
 		OutList.append(Line)
 OutFileName = OutFolder+OutFilePre+"dup_pos_dict.txt"
 OutFileWriting(OutFileName, OutList)
+
+#writing a script to re-align the sequences to prepare them to be made into species trees!
+Script1FileName = OutFolder+OutFilePre+"analysis_script1.sh"
+Script2FileName = OutFolder+OutFilePre+"analysis_script2.sh"
+OutScript1 = ['#! /bin/bash\n\n']
+OutScript2 = [ ]
+for Locus in NewParInfoDict:
+	for DupName in NewParInfoDict[Locus]:
+		ParName = NewParInfoDict[Locus][DupNode]['Name']
+		#remove existing alignment
+		Line = "rm "+OutFolder+OutFilePre+Locus+"_"+ParName+OutFilePost+"_al.fa\n"
+		OutScript1.append(Line)
+		#align
+		Line = "mafft --localpair --maxiterate 1000 --quiet "+OutFolder+OutFilePre+Locus+"_"+ParName+OutFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+ParName+OutFilePost+"_al.fa\n"
+		OutScript2.append(Line)
+Line = "cat "+Script2FileName+" | parallel --joblog "+OutFolder+OutFilePre+"parallel_log.log\n"
+OutScript1.append(Line)
+OutFileWriting(Script1FileName, OutScript1)
+OutFileWriting(Script2FileName, OutScript2)

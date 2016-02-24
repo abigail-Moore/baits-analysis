@@ -15,7 +15,7 @@ from Bio import SeqIO #to read files of non-aligned sequences
 
 #Example:
 '''
-tassembly_to_blast.py InFolder LocusFileName SeqFolder SeqFilePre BCFileName BlastDBName OutFolder OutFilePre
+tassembly_to_blast.py InFolder LocusFileName SeqFolder SeqFilePre IndListFileName BlastDBName OutFolder OutFilePre
 '''
 
 print ("%s\n" % (" ".join(sys.argv)))
@@ -40,7 +40,7 @@ else:
 	SeqFilePre = sys.argv[4]
 	if SeqFilePre == "none":
 		SeqFilePre = ""
-	BCFileName = sys.argv[5]
+	IndListFileName = sys.argv[5]
 	BlastDBName = sys.argv[6]
 	OutFolder = sys.argv[7]
 	if sys.argv[8] == "none":
@@ -52,7 +52,7 @@ LocusDict = { } #List of loci and their associated individuals, read from LocusF
 ContigDict = defaultdict(dict)#Dictionary of contigs arranged according to locus
 #and individual: ContigDict[Locus][Ind][SeqName] = Seq
 ContigNumDict = { }#The number of contigs per locus
-IndList = [ ] #List of individuals to be read from BCFileName
+IndList = [ ] #List of individuals to be read from IndListFileName
 NumSeqs = 0
 
 if InFolder[-1:] != "/":
@@ -73,15 +73,16 @@ print("The list of %d loci was read from the file %s.\n" % (len(LocusDict), Locu
 sys.stderr.write("The list of %d loci was read from the file %s.\n" % (len(LocusDict), LocusFileName))
 
 #getting the list of individuals to be blasted against these sequences
-InFile = open(BCFileName, 'rU')
+InFile = open(IndListFileName, 'rU')
 for Line in InFile:
 	Line = Line.strip('\n').strip('\r').split('\t')
-	IndList.append(Line[1])
+	IndList.append(Line[0])
 InFile.close()
-print("The list of %d individuals was read from the file %s.\n" % (len(IndList), BCFileName))
-sys.stderr.write("The list of %d individuals was read from the file %s.\n" % (len(IndList), BCFileName))
+print("The list of %d individuals was read from the file %s.\n" % (len(IndList), IndListFileName))
+sys.stderr.write("The list of %d individuals was read from the file %s.\n" % (len(IndList), IndListFileName))
 
 #getting the sequences for that locus from the various contigs.fasta files
+IndNumDict = defaultdict(int)
 for Locus in LocusDict:
 	ContigDict[Locus] = defaultdict(dict)
 	NumSeqs = 0
@@ -124,6 +125,7 @@ for Locus in LocusDict:
 					SeqName = Locus+"+"+ContigPre+"+"+record.id
 					ContigDict[Locus][Ind][SeqName] = str(record.seq)
 					NumSeqs += 1
+					IndNumDict[Ind] += 1
 	ContigNumDict[Locus] = NumSeqs
 	print("%d contigs were found in a total of %d individuals for locus %s.\n" % (NumSeqs, len(ContigDict[Locus].keys()), Locus))
 	sys.stderr.write("%d contigs were found in a total of %d individuals for locus %s.\n" % (NumSeqs, len(ContigDict[Locus].keys()), Locus))
@@ -144,22 +146,37 @@ for Line in OutList:
 	OutFile.write(Line)
 OutFile.close()
 
+NumSeqsDict = defaultdict(list)
+for Ind in IndNumDict:
+	NumSeqsDict[IndNumDict[Ind]].append(Ind)
+IndListOut = [ ]
+for NumSeqs in sorted(NumSeqsDict.keys(), reverse = True):
+	IndListOut += NumSeqsDict[NumSeqs]
+
 #writing the blast script:
-BlastList = ['#! /bin/bash\n']
+BlastList1 = ['#! /bin/bash\n']
+BlastList2 = [ ]
 Line = "cat "+BlastDBName+" "+OutFileName+" > "+OutFolder+OutFilePre+"spades_baits_combined.fa\n"
 Line += "makeblastdb -in "+OutFolder+OutFilePre+"spades_baits_combined.fa -out "+OutFolder+OutFilePre+"spades_baits_combined -dbtype nucl\n"
-BlastList.append(Line)
-for IndName in IndList:
+BlastList1.append(Line)
+for IndName in IndListOut:
 	Line = "blastn -task blastn -db "+OutFolder+OutFilePre+"spades_baits_combined -query "+SeqFolder+SeqFilePre+IndName+"_R1.fa -out "+OutFolder+OutFilePre+IndName+"_R1.out -outfmt '6 std qlen slen'\n"
 	Line += "blastn -task blastn -db "+OutFolder+OutFilePre+"spades_baits_combined -query "+SeqFolder+SeqFilePre+IndName+"_R2.fa -out "+OutFolder+OutFilePre+IndName+"_R2.out -outfmt '6 std qlen slen'\n"
-	BlastList.append(Line)
+	BlastList2.append(Line)
 #Now I need to write the script for blasting the other files against this database.
+OutFileName1 = OutFolder+OutFilePre+"BlastScript1.sh"
+OutFileName2 = OutFolder+OutFilePre+"BlastScript2.sh"
+Line = "cat "+OutFileName2+" | parallel --jobs = "+NCores+" --joblog "+OutFolder+OutFilePre+"parallel_log.log\n"
+OutFileName1.append(Line)
 
-OutFileName = OutFolder+OutFilePre+"BlastScript.sh"
-OutFile = open(OutFileName,'w')
-for Line in BlastList:
+OutFile = open(OutFileName1,'w')
+for Line in BlastList1:
 	OutFile.write(Line)
 OutFile.close()
-print("The script for making a blast database out of these sequences is %s.\n" % (OutFileName))
-sys.stderr.write("The script for making a blast database out of these sequences is %s.\n" % (OutFileName))
+OutFile = open(OutFileName2,'w')
+for Line in BlastList2:
+	OutFile.write(Line)
+OutFile.close()
+print("The script for making a blast database out of these sequences is %s.\n" % (OutFileName1))
+sys.stderr.write("The script for making a blast database out of these sequences is %s.\n" % (OutFileName1))
 

@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-#tcontig_selection.py version 1.0 27 Oct. 2015 Abby Moore
+#tcontig_selection.py version 1.1 17 Feb. 2016 Abby Moore
 #This script follows tcontigs_to_fixed_paralogs.py and goes through the alignments of contigs that can't be 
 #assembled into good enough consensus sequences.  It selects the best segment of the alignment using four criteria
 #involving the contigs with significant overlap with that region:
@@ -9,6 +9,8 @@
 #overlapping region.
 #It reads the list of paralogs and groups from the OutFilePre_Contigs_to_Redo.txt file, produced by tundivcontigs_combiner.py
 #script by combining the undivisible contigs from the various groups.
+#Version 1.1 is modified so that it only selects contigs over 100bp.
+
 '''
 (no header, tab-delimitted)
 (one line per group, even when everything else is the same)
@@ -26,7 +28,7 @@ Anacs/none: GroupName (or "none") [1]
 
 '''
 tcontig_selection.py PFileName GFileName InFolder InFilePre OutFolder OutFilePre SeqFilePath SeqFolderPre SeqFolderPost SeqFilePre IndDictFileName
-tcontig_selection.py ~/transcriptomes/sandbox/amk/testing/Mts2_Loci_to_Redo.txt ~/transcriptomes/sandbox/amk/testing/ undivcontigs_Mts2_ same partialseqs_Mts2_
+/gpfs/scratch/ajm3/eedwards/scripts/tcontig_selection.py /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_contigsplit/Ln1tcs_Contigs_to_Redo.txt /gpfs/scratch/ajm3/eedwards/general/Group_List_round1_all.txt /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_contigsplit/ Ln1tcs_ same Ln1tcs_ /gpfs/scratch/ajm3/eedwards/ s2_ spades_Ln1t_sequences/ Ln1ts5_ /gpfs/scratch/ajm3/eedwards/general/Ln1_inds2.txt
 '''
 
 import sys
@@ -37,7 +39,7 @@ from collections import defaultdict #to make dictionaries with multiple levels
 import random #to choose items at random from a list
 
 Usage = '''
-tcontig_selection.py version 1.0
+tcontig_selection.py version 1.1
 This script looks through alignments with multiple contigs per individual and the
 name of the individual separated from the rest of the name of the contig by a "-"
 symbol.  It chooses a subset of contigs to analyze further for each individual,
@@ -89,6 +91,8 @@ SeqFilePre = sys.argv[10]
 if SeqFilePre == "none":
 	SeqFilePre = ""
 IndDictFileName = sys.argv[11]
+
+Verbose = False
 
 #DictFromFile makes a dictionary from a tab-delimited file, where the keys are in columns KC, and
 #the values are in column VC
@@ -179,7 +183,7 @@ def GapFinder(AlignTemp):
 		DictTemp[GapNum]['start'] = GapStart
 		DictTemp[GapNum]['end'] = SeqPos
 		GapLength += (SeqPos-GapStart+1)
-	print("%d gaps were found, with a total length of %d.\n" % (GapNum+1, GapLength))
+	if Verbose == True: print("%d gaps were found, with a total length of %d.\n" % (GapNum+1, GapLength))
 	return DictTemp
 	#This is GapDict in AlignmentGapRemoving
 
@@ -188,7 +192,7 @@ def GapFinder(AlignTemp):
 def AlignmentGapRemoving(AlignGaps):
 	GapDict = GapFinder(AlignGaps)
 	AlEnd = AlignGaps.get_alignment_length()-1
-	print("Before removing any gaps, the alignment is %d bases long.\n" % (AlEnd+1))
+	if Verbose == True: print("Before removing any gaps, the alignment is %d bases long.\n" % (AlEnd+1))
 	for GapNum in sorted(GapDict.keys(), reverse=True):
 		#print("Before removing gap %d: gap length: %d, alignment length %d\n" % (GapNum, GapDict[GapNum]['end']-GapDict[GapNum]['start']+1, AlignGaps.get_alignment_length()))
 		#if this gap encompasses the end of the alignment, cut that bit off of the end of the alignment
@@ -201,22 +205,9 @@ def AlignmentGapRemoving(AlignGaps):
 		else:
 			AlignGaps = AlignGaps[:, :GapDict[GapNum]['start']] + AlignGaps[:, (GapDict[GapNum]['end']+1):]
 		#print("After removing gap %d: alignment length %d\n" % (GapNum, AlignGaps.get_alignment_length()))
-	print("After removing %d gaps, the alignment is now %d bases long.\n" % (len(GapDict), AlignGaps.get_alignment_length()))
+	if Verbose == True: print("After removing %d gaps, the alignment is now %d bases long.\n" % (len(GapDict), AlignGaps.get_alignment_length()))
 	return AlignGaps
 	#This is now PAlign
-
-#GetAlignmentCoverage makes a dictionary for an alignment, in which the keys are the alignment positions
-#and the values are the number of individuals that have sequence at that position.
-def GetAlignmentCoverage(AlignTemp):
-	DictTemp = { }#DictTemp[SeqPos] = NonGap (number of sequences that don't have a gap there)
-	for SeqPos in range(0, AlignTemp.get_alignment_length()):
-		NonGap = 0
-		for record in AlignTemp:
-			if record[SeqPos] != '-':
-				NonGap += 1
-		DictTemp[SeqPos] = NonGap
-	return DictTemp
-	#This is CoverageDict
 
 #AlInfoFinder makes three things:
 #a dictionary containing information about sequences in an alignment (DictTemp)
@@ -252,9 +243,10 @@ def AlInfoFinder(AlignTemp, SepChar, Overlap):
 		DictTemp[Contig]['CEnd'] = CEnd
 		DictTemp[Contig]['CLength'] = CLength
 		Length2 = CEnd-CStart+1
-		#if Length2 > 1.25*CLength:
-			#print("WARNING! Contig %s has many gaps.  It covers %d bases in the alignment, but only has information at %d of those bases.\n" % (Contig, Length2, CLength))
-		#print("%s: start: %d, end: %d, length1: %d, length2: %d\n" % (Contig, CStart, CEnd, CLength, Length2))
+		if Verbose == True:
+			if Length2 > 1.25*CLength:
+				print("WARNING! Contig %s has many gaps.  It covers %d bases in the alignment, but only has information at %d of those bases.\n" % (Contig, Length2, CLength))
+			print("%s: start: %d, end: %d, length1: %d, length2: %d\n" % (Contig, CStart, CEnd, CLength, Length2))
 	#now looking through the contigs again, to determine overlap
 	for Contig in DictTemp:
 		CS1 = DictTemp[Contig]['CStart']
@@ -268,7 +260,7 @@ def AlInfoFinder(AlignTemp, SepChar, Overlap):
 			OVE = min(CE1, CE2)
 			OVL = OVE-OVS+1
 			if (OVL > Overlap*CL1) or (OVL > Overlap*CL2):
-				#print("Sequences %s (length %d) and %s (length %d) overlap by %d bases.\n" % (Contig, CL1, Contig2, CL2, OVL))
+				if Verbose == True: print("Sequences %s (length %d) and %s (length %d) overlap by %d bases.\n" % (Contig, CL1, Contig2, CL2, OVL))
 				OVDict[Contig].append(Contig2)
 	return DictTemp, INDict, OVDict
 	#DictTemp is CInfoDict
@@ -286,11 +278,11 @@ def BreakFinder(IDict, IntPercent):
 		except KeyError: SEDict[CS] = 1 
 		try: SEDict[CE] += 1
 		except KeyError: SEDict[CE] = 1
-	#print("%s" % (", ".join([str(Num)+": "+str(SEDict[Num]) for Num in sorted(SEDict.keys())])))
+	if Verbose == True: print("%s" % (", ".join([str(Num)+": "+str(SEDict[Num]) for Num in sorted(SEDict.keys())])))
 	SEBPDict = defaultdict(dict)
 	AlEnd = sorted(SEDict.keys())[-1]
 	IntervalSize = IntPercent*AlEnd
-	print("Starts and ends of contigs within %.2f of one another, will be considered to be starting or ending at the same breakpoint.\n" % (IntervalSize))
+	if Verbose == True: print("Starts and ends of contigs within %.2f of one another, will be considered to be starting or ending at the same breakpoint.\n" % (IntervalSize))
 	#There is also the question if I want more information in the SEDict, such as a list of contigs (the dictionary could even be the list of contigs, and
 	#the number of individuals with each break point could be the length of the list--this would eliminate the KeyError stuff, although perhaps I could use defaultdict(int) and
 	#get rid of it that way instead).
@@ -318,14 +310,14 @@ def BreakFinder(IDict, IntPercent):
 	#The latter eliminates all repeated BPMems numbers, which basically shifts the mean to the right, because the
 	#repeated BPMems numbers are mainly 1s, 2s, and 3s.
 	BPThreshold = numpy.median(list(set(BPMemList)))
-	print("The alignment will be broken up at all break points where at least %.1f contigs start or end.\n" % (BPThreshold))
+	if Verbose == True: print("The alignment will be broken up at all break points where at least %.1f contigs start or end.\n" % (BPThreshold))
 	#Finding the positions of all of the breakpoints that are common enough.
 	MajBPList = [ ]
 	for BPNum in BPDict:
 		if BPDict[BPNum]['BPMems'] >= BPThreshold:
 			BPPair = [BPDict[BPNum]['BPStart'], BPDict[BPNum]['BPEnd']]
 			MajBPList.append(BPPair)
-	print("There are %d such breakpoints.\n" % (len(MajBPList)))
+	if Verbose == True: print("There are %d such breakpoints.\n" % (len(MajBPList)))
 	MajBPList = sorted(MajBPList)
 	#Finding the segments of the sequence
 	DictTemp = defaultdict(dict)#DictTemp[SegNum]['SegStart'/'SegEnd'] = SeqPos (this will be built upon later)
@@ -351,7 +343,7 @@ def BreakFinder(IDict, IntPercent):
 	#if so, deleting the partially-written breakpoint that would have gone over the edge of the alignment
 	else:
 		del DictTemp[SegNum-1]
-	print("These breakpoints divided the alignment into %d segments.\n" % (len(DictTemp)))
+	if Verbose == True: print("These breakpoints divided the alignment into %d segments.\n" % (len(DictTemp)))
 	return DictTemp
 	#This is AlSegDict
 
@@ -423,9 +415,10 @@ def SegMembershipFinder(SegDictIn, CDict, OVPercent, PGDict):
 			NumContigsi += SegDictIn[SegNum]['IndDict'][IndName]
 		if NumContigsi != NumContigss:
 			sys.exit("ERROR!!!  For segment %d, %d contigs were listed, but only %d of them were classified to individual!!" % (SegNum, NumContigss, NumContigsi))
-		print("%d: SeqStart: %d, SeqEnd: %d, Overlaps: %s, Groups: %d" % (SegNum, SegDictIn[SegNum]['SegStart'], SegDictIn[SegNum]['SegEnd'], ", ".join([str(OVLength) for OVLength in SegDictIn[SegNum]['Overlap']]), SegDictIn[SegNum]['NumGroups']))
-		#print("%s" % (", ".join([IndName+": "+str(SegDictIn[SegNum]['IndDict'][IndName]) for IndName in sorted(SegDictIn[SegNum]['IndDict'].keys())])))
-		#print("%s" % (", ".join(sorted(SegDictIn[SegNum]['ContigList']))))
+		if Verbose == True:
+			print("%d: SeqStart: %d, SeqEnd: %d, Overlaps: %s, Groups: %d" % (SegNum, SegDictIn[SegNum]['SegStart'], SegDictIn[SegNum]['SegEnd'], ", ".join([str(OVLength) for OVLength in SegDictIn[SegNum]['Overlap']]), SegDictIn[SegNum]['NumGroups']))
+			print("%s" % (", ".join([IndName+": "+str(SegDictIn[SegNum]['IndDict'][IndName]) for IndName in sorted(SegDictIn[SegNum]['IndDict'].keys())])))
+			print("%s" % (", ".join(sorted(SegDictIn[SegNum]['ContigList']))))
 	return SegDictIn, ISDict
 	#SegDictIn is SegMemDict.
 	#ISDict is IndSegDict.
@@ -465,34 +458,54 @@ def SegSelector(SegDictIn, TotalGroups):
 	SegScoreDict = defaultdict(list)#SegScoreDict[SegNum] = list of categories in which it was near the best
 	AllGroupsList = [ ]
 	for SegNum in sorted(SegDictIn.keys()):
-		#if it has at least the minimum number of overlapping contigs:
-		if SegDictIn[SegNum]['NumContigs'] >= GSCon:
-			#adding "NumContigs" to the list of categories in which it is near the best
-			SegScoreDict[SegNum].append("NumContigs")
-		if SegDictIn[SegNum]['NumInds'] >= GSInds:
-			SegScoreDict[SegNum].append("NumInds")
-		if SegDictIn[SegNum]['MeanOVLength'] >= GSOV:
-			SegScoreDict[SegNum].append("MeanOVLength")
-		if SegDictIn[SegNum]['MedCLength'] >= GSLongest:
-			SegScoreDict[SegNum].append("MedCLength")
-		if SegDictIn[SegNum]['TotOVLen'] >= GSTotOV:
-			SegScoreDict[SegNum].append("TotOVLen")
-		if SegDictIn[SegNum]['NumGroups'] == TotalGroups:
-			SegScoreDict[SegNum].append("AllGroups")
-			AllGroupsList.append(SegNum)
-	print("In total, %d segments were among the best in at least one of the six categories.\n" % (len(SegScoreDict)))
-	print("The following segments had all groups present: %s\n" % (", ".join([str(SegNum) for SegNum in AllGroupsList])))
+		#only looking at segments with a median contig length over 100, because these are the only ones that will be in
+		#the final tree
+		if SegDictIn[SegNum]['MedCLength'] >= 100:
+			#if it has at least the minimum number of overlapping contigs:
+			if SegDictIn[SegNum]['NumContigs'] >= GSCon:
+				#adding "NumContigs" to the list of categories in which it is near the best
+				SegScoreDict[SegNum].append("NumContigs")
+			if SegDictIn[SegNum]['NumInds'] >= GSInds:
+				SegScoreDict[SegNum].append("NumInds")
+			if SegDictIn[SegNum]['MeanOVLength'] >= GSOV:
+				SegScoreDict[SegNum].append("MeanOVLength")
+			if SegDictIn[SegNum]['MedCLength'] >= GSLongest:
+				SegScoreDict[SegNum].append("MedCLength")
+			if SegDictIn[SegNum]['TotOVLen'] >= GSTotOV:
+				SegScoreDict[SegNum].append("TotOVLen")
+			if SegDictIn[SegNum]['NumGroups'] == TotalGroups:
+				SegScoreDict[SegNum].append("AllGroups")
+				AllGroupsList.append(SegNum)
+	#But I guess if there are no segments with median length over 100, then we should run it again to get something.
+	if SegScoreDict == { }:
+		for SegNum in sorted(SegDictIn.keys()):
+			if SegDictIn[SegNum]['NumContigs'] >= GSCon:
+				SegScoreDict[SegNum].append("NumContigs")
+			if SegDictIn[SegNum]['NumInds'] >= GSInds:
+				SegScoreDict[SegNum].append("NumInds")
+			if SegDictIn[SegNum]['MeanOVLength'] >= GSOV:
+				SegScoreDict[SegNum].append("MeanOVLength")
+			if SegDictIn[SegNum]['MedCLength'] >= GSLongest:
+				SegScoreDict[SegNum].append("MedCLength")
+			if SegDictIn[SegNum]['TotOVLen'] >= GSTotOV:
+				SegScoreDict[SegNum].append("TotOVLen")
+			if SegDictIn[SegNum]['NumGroups'] == TotalGroups:
+				SegScoreDict[SegNum].append("AllGroups")
+				AllGroupsList.append(SegNum)
+	if Verbose == True:
+		print("In total, %d segments were among the best in at least one of the six categories.\n" % (len(SegScoreDict)))
+		print("The following segments had all groups present: %s\n" % (", ".join([str(SegNum) for SegNum in AllGroupsList])))
 	#now figuring out which of the segments were among the best in the greatest number of categories
 	ChooseSegDict = defaultdict(list)#ChooseSegDict[NumCats] = list of SegNums that were the best in that many categories
 	for SegNum in sorted(SegScoreDict.keys()):#just sorting this to make the output nicer
-		print("Segment %d was among the best in the categories %s.\n" % (SegNum, ", ".join(SegScoreDict[SegNum])))
+		if Verbose == True: print("Segment %d was among the best in the categories %s.\n" % (SegNum, ", ".join(SegScoreDict[SegNum])))
 		ChooseSegDict[len(SegScoreDict[SegNum])].append(SegNum)
 	ChooseSegSorted = sorted(ChooseSegDict.keys())#the sorted list of NumCats(ranging from 1 to 5, because there are at most 5 categories in which a segment can be among the best)
 	BestSegList = ChooseSegDict[ChooseSegSorted[-1]]#the list of the segments that were among the best in the greatest number of categories
 	#If one segment is the best in more categories, choose it.
 	if len(BestSegList) == 1:
 		BestSeg = BestSegList[0]
-		print("The best segment is clearly %d, as it is the only segment that is among the best in %d or more categories!\n" % (BestSeg, ChooseSegSorted[-1]))
+		if Verbose == True: print("The best segment is clearly %d, as it is the only segment that is among the best in %d or more categories!\n" % (BestSeg, ChooseSegSorted[-1]))
 	#If not, we need to look more closely.
 	else:
 		#see which other segments are close for total overlap length:
@@ -501,7 +514,7 @@ def SegSelector(SegDictIn, TotalGroups):
 			if SegDictIn[SegNum]['TotOVLen'] >= GSTotOV:
 				BestOVList.append(SegNum)
 		if len(BestOVList) == 1:
-			print("Segment %d is preferred, as it had the greatest mean overlap length.\n" % (BestOVList[0]))
+			if Verbose == True: print("Segment %d is preferred, as it had the greatest mean overlap length.\n" % (BestOVList[0]))
 			BestSeg = BestOVList[0]
 		#but if there are more than one of these, looking at the rest of the categories:
 		else:
@@ -522,23 +535,24 @@ def SegSelector(SegDictIn, TotalGroups):
 					BestScoreDict[SegNum].append("TotOVLen")
 				if SegDictIn[SegNum]['NumGroups'] == TotalGroups:
 					BestScoreDict[SegNum].append("AllGroups")
-			print("In total, %d of these segments segments were the best in at least one of the six categories.\n" % (len(BestScoreDict)))
+			if Verbose == True: print("In total, %d of these segments segments were the best in at least one of the six categories.\n" % (len(BestScoreDict)))
 			ChooseBestSegDict = defaultdict(list)#This is the equivalent of ChooseSegDict
 			for SegNum in sorted(BestScoreDict.keys()):
-				print("Segment %d was the best overall in the categories %s.\n" % (SegNum, ", ".join(BestScoreDict[SegNum])))
+				if Verbose == True: print("Segment %d was the best overall in the categories %s.\n" % (SegNum, ", ".join(BestScoreDict[SegNum])))
 				ChooseBestSegDict[len(BestScoreDict[SegNum])].append(SegNum)
 			ChooseBestSegSorted = sorted(ChooseBestSegDict.keys())#equivalent to ChooseSegSorted
 			WinningSegList = ChooseBestSegDict[ChooseBestSegSorted[-1]]
 			#Hopefully this process will result in one segment being chosen.
 			if len(WinningSegList) == 1:
 				BestSeg = WinningSegList[0]
-				print("The best segment is clearly %d, as it is the only segment that is the absolute best in %d or more categories!\n" % (BestSeg, ChooseBestSegSorted[-1]))
+				if Verbose == True: print("The best segment is clearly %d, as it is the only segment that is the absolute best in %d or more categories!\n" % (BestSeg, ChooseBestSegSorted[-1]))
 			#But, if not, the segment with the longest total overlapping length will be chosen.  Or maybe do that to start out with??
 			#It would be possible to instead rate categories so that the sequence with the most individuals would be chosen, and if they were both equal, go to another category, etc.
 			else:
-				print("There were %d segments that were the absolute best in %d categories: %s.\n" % (len(WinningSegList), ChooseBestSegSorted[-1], ", ".join([str(Num) for Num in WinningSegList])))
 				BestSeg = random.choice(WinningSegList)
-				print("Of these segments, segment %d was randomly chosen to be used further.\n" % (BestSeg))
+				if Verbose == True:
+					print("There were %d segments that were the absolute best in %d categories: %s.\n" % (len(WinningSegList), ChooseBestSegSorted[-1], ", ".join([str(Num) for Num in WinningSegList])))
+					print("Of these segments, segment %d was randomly chosen to be used further.\n" % (BestSeg))
 	if BestSeg == 0:
 		sys.exit("ERROR!!!  A segment could not be selected for further analysis.")
 	return BestSeg
@@ -555,7 +569,7 @@ def SegAlMaker(SegNum, SegDictIn, GContigList, OldAlign):
 		NewAlign = AlignmentSubsetting(OldAlign,ListTemp)
 		if NewAlign == "":
 			print("No contigs were found for segment %d.\n" % (SegNum))
-	print("%d contigs were written to the new alignment for segment %d.\n" % (len(NewAlign), SegNum))
+	if Verbose == True: print("%d contigs were written to the new alignment for segment %d.\n" % (len(NewAlign), SegNum))
 	return NewAlign
 	#This is SegmentAlign or SegmentGroupAlign
 
@@ -624,14 +638,12 @@ for Locus in ParalogDict:
 		#reading the alignment with all sequences (both our contigs and the backbone sequences)
 		PAlignAllSeqs = AlignIO.read(open(InFileName), "fasta")
 		PAlignGaps = AlignmentSubsetting(PAlignAllSeqs, ParalogDict[Locus][Paralog]['all'])
-		print("The alignment for paralog %s has %d sequences, is %d nucleotides long with gaps, and includes the following groups: %s.\n" % (Paralog, len(PAlignGaps), PAlignGaps.get_alignment_length(), ", ".join([Group for Group in ParalogDict[Locus][Paralog].keys() if Group not in ['all']])))
+		if Verbose == True: print("The alignment for paralog %s has %d sequences, is %d nucleotides long with gaps, and includes the following groups: %s.\n" % (Paralog, len(PAlignGaps), PAlignGaps.get_alignment_length(), ", ".join([Group for Group in ParalogDict[Locus][Paralog].keys() if Group not in ['all']])))
 		#removing the gaps from the alignment
 		PAlign = AlignmentGapRemoving(PAlignGaps)
 		OutFileName = InFolder+InFilePre+Paralog+"align_temp_onlycontigs.fa"
 		AlignIO.write(PAlign, OutFileName, "fasta")
-		print("With no gaps, the alignment has %d sequences and is %d nucleotides long.\n" % (len(PAlign), PAlign.get_alignment_length()))
-		#looking at the coverage for each place in the alignment--I don't currently use this
-		CoverageDict = GetAlignmentCoverage(PAlign)
+		if Verbose == True: print("With no gaps, the alignment has %d sequences and is %d nucleotides long.\n" % (len(PAlign), PAlign.get_alignment_length()))
 		#figuring out where each contig is in the alignment
 		(CInfoDict, IndSeqDict, OverDict) = AlInfoFinder(PAlign, "-", 0.8)
 		#dividing the alignment into segments by looking for places where a lot of contigs start or end

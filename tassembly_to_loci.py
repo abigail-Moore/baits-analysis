@@ -155,7 +155,8 @@ for Locus in LocusDict:
 	sys.stderr.write("%d contigs were found in a total of %d individuals for locus %s.\n" % (NumSeqs, len(ContigDict[Locus].keys()), Locus))
 
 #writing everything to the outfile
-BlastList = ['#! /bin/bash\n']
+BlastList1 = ['#! /bin/bash\n']
+BlastList2 = [ ]
 BlastFileList = [ ]
 for Locus in ContigDict.keys():
 	if len(ContigDict[Locus].keys()) > 0:
@@ -179,19 +180,26 @@ for Locus in ContigDict.keys():
 			sys.stderr.write("ERROR!!! %d contigs were found for locus %s, but only %d of them were written to the file.\n" % \
 				(NumSeqs, Locus, ContigNumDict[Locus]))
 		Line = "blastn -db "+BlastFolder+Locus+BlastDBPost+" -query "+OutFileName+" -out "+OutFolder+BlastFilePre+Locus+".out -outfmt 6 -task blastn\n"
-		BlastList.append(Line)
+		BlastList2.append(Line)
 		Line = BlastFilePre+Locus+".out\t"+OutFilePre+Locus+".fa\n"
 		BlastFileList.append(Line)
 print("Contigs for %d loci were written to files with names such as %s.\n" % (len(ContigDict.keys()), OutFileName))
 sys.stderr.write("Contigs for %d loci were written to files with names such as %s.\n" % (len(ContigDict.keys()), OutFileName))
 
-OutFileName = OutFolder+BlastFilePre+"BlastScript.sh"
-OutFile = open(OutFileName,'w')
-for Line in BlastList:
+OutFileName1 = OutFolder+BlastFilePre+"BlastScript1.sh"
+OutFileName2 = OutFolder+BlastFilePre+"BlastScript2.sh"
+Line = "cat "+OutFileName2+" | parallel --joblog "+OutFolder+BlastFilePre+"parallel_log.log\n"
+BlastLine1.append(Line)
+OutFile = open(OutFileName1,'w')
+for Line in BlastList1:
 	OutFile.write(Line)
 OutFile.close()
-print("The script for blasting these files against the exon databases was written to %s.\n" % (OutFileName))
-sys.stderr.write("The script for blasting these files against the exon databases was written to %s.\n" % (OutFileName))
+OutFile = open(OutFileName2,'w')
+for Line in BlastList2:
+	OutFile.write(Line)
+OutFile.close()
+print("The script for blasting these files against the exon databases was written to %s.\n" % (OutFileName1))
+sys.stderr.write("The script for blasting these files against the exon databases was written to %s.\n" % (OutFileName1))
 
 OutFileName = OutFolder+BlastFilePre+"BlastFileList.txt"
 OutFile = open(OutFileName,'w')

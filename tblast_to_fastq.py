@@ -4,6 +4,8 @@
 #This script reads the Seqs_to_Loci.txt output 
 #from tbaits_blastn_parse.py or tbaits_blast_parse.py
 #and writes files for each locus for each individual.
+#version 1.1 23 Feb. 2016, outscript parallelized
+
 #It expects file with the header:
 #Locus_Name	Individual_Name	Number_of_Hits	Sequence_Names
 #and subsequent lines like (tab-delimited):
@@ -155,7 +157,7 @@ for Ind in IndList:
 				BothBad += 1
 		LineNum += 1
 	InFile1.close()
-	InFile2.close()			
+	InFile2.close()
 	print("%s had %d sequences where both reads were good,\n" % (Ind, BothGood))
 	print("%d sequences where one read was good, and %d sequences where\n" % (OneGood, BothBad))
 	print("neither read was good, out of %d total blast hits.\n" % (len(SeqNameDict[Ind].keys())))
@@ -203,52 +205,60 @@ for Ind in IndList:
 	sys.stderr.write("Sequences were written to %d files, with names such as %s.\n" % (NumFiles, OutFileName1))
 
 #Making a script to analyze the sequences using Spades:
-OutList = [ ]
-Line = "#! /bin/bash\n\n"
-OutList.append(Line)
+OutScript1 = [ "#! /bin/bash\n\n" ]
+OutScript2 = [ ]
 Line = "mkdir "+OutFolder+OutFilePre+"Spades_Contigs/\n"
-OutList.append(Line)
+OutScript1.append(Line)
 for Locus in OutScriptDict.keys():
 	Line = "mkdir "+OutFolder+Locus+"\n"
-	OutList.append(Line)
+	OutScript1.append(Line)
 	if OutMode == "separate":
-		for Ind in OutScriptDict[Locus]:
+		for Ind in IndListOut:
 			OutFolderName = OutFolder+Locus+"/"+Ind
 			Line = "mkdir "+OutFolderName+"\n"
-			OutList.append(Line)
+			OutScript1.append(Line)
 			if len(OutScriptDict[Locus][Ind]) == 2:
 				Line = "spades.py -o "+OutFolderName+" --pe1-1 "+OutScriptDict[Locus][Ind][0]+" --pe1-2 "+OutScriptDict[Locus][Ind][1]+" -t 4 -m 64\n"
-				OutList.append(Line)
+				OutScript2.append(Line)
 			elif len(OutScriptDict[Locus][Ind]) == 3:
 				Line = "spades.py -o "+OutFolderName+" --pe1-1 "+OutScriptDict[Locus][Ind][0]+" --pe1-2 "+OutScriptDict[Locus][Ind][1]+" --pe1-s "+OutScriptDict[Locus][Ind][2]+" -t 4 -m 64\n"
-				OutList.append(Line)
+				OutScript2.append(Line)
 			elif len(OutScriptDict[Locus][Ind]) == 1:
 				Line = "spades.py -o "+OutFolderName+" --pe1-s "+OutScriptDict[Locus][Ind][0]+" -t 4 -m 64\n"
-				OutList.append(Line)
+				OutScript2.append(Line)
 	elif OutMode == "together":
 		OutFolderName = OutFolder+Locus+"/together"
 		Line = "mkdir "+OutFolderName+"\n"
-		OutList.append(Line)
+		OutScript1.append(Line)
 		try:
 			Line = "spades.py -o "+OutFolderName+" --pe1-1 "+OutScriptDict[Locus]['R1_R2'][0]+" --pe1-2 "+OutScriptDict[Locus]['R1_R2'][1]+" --pe1-s "+OutScriptDict[Locus]['S'][0]+" -t 4 -m 64\n"
-			OutList.append(Line)
+			OutScript2.append(Line)
 		except KeyError:
 			Line = "spades.py -o "+OutFolderName+" --pe1-1 "+OutScriptDict[Locus]['R1_R2'][0]+" --pe1-2 "+OutScriptDict[Locus]['R1_R2'][1]+" -t 4 -m 64\n"
-			OutList.append(Line)
+			OutScript2.append(Line)
 
+OutFileName1 = OutFolder+"spades_script_"+OutMode+"1.sh"
+OutFileName2 = OutFolder+"spades_script_"+OutMode+"2.sh"
 
-OutFileName = OutFolder+"spades_script_"+OutMode+".sh"
-OutFile = open(OutFileName, 'w')
-for Line in OutList:
+Line = "cat "+OutFileName2+" | parallel --joblog "+OutFolder+"parallel_log.log\n"
+OutScript1.append(Line)
+
+OutFile = open(OutFileName1, 'w')
+for Line in OutScript1:
+	OutFile.write(Line)
+OutFile.close()
+OutFile = open(OutFileName2, 'w')
+for Line in OutScript2:
 	OutFile.write(Line)
 OutFile.close()
 
+
 if OutMode == "separate":
-	print("The shell script to analyze the individuals separately using spades is %s.\n" % (OutFileName))
-	sys.stderr.write("The shell script to analyze the individuals separately using spades is %s.\n" % (OutFileName))
+	print("The shell script to analyze the individuals separately using spades is %s.\n" % (OutFileName1))
+	sys.stderr.write("The shell script to analyze the individuals separately using spades is %s.\n" % (OutFileName1))
 elif OutMode == "together":
-	print("The shell script to analyze the all individuals together using spades is %s.\n" % (OutFileName))
-	sys.stderr.write("The shell script to analyze the all individuals together using spades is %s.\n" % (OutFileName))
+	print("The shell script to analyze the all individuals together using spades is %s.\n" % (OutFileName1))
+	sys.stderr.write("The shell script to analyze the all individuals together using spades is %s.\n" % (OutFileName1))
 
 LocusList = OutScriptDict.keys()
 LocusList = sorted(LocusList)

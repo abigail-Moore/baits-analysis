@@ -1,9 +1,14 @@
 #! /usr/bin/env python
 
-#tparalog_combiner.py version 1.0 23 June 2015 Abby Moore
+#tparalog_combiner.py version 1.1 23 Feb. 2016 Abby Moore
 #This script combines the sequences from the various paralogs found by tcontigs_to_paralogs.py
 #into a single alignment, along with the backbone sequences.  It also labels the
 #sequences according to their paralog.
+#version 1.0 23 June 2015
+#version 1.1 23 Feb. 2016 modified so that the sequences are ordered in parallel
+#**************This changed version has not been tested.***********
+
+
 #It also combines the following files with information about the paralogs:
 #OutFolder+OutFilePre_Ind_Seq_Info.txt (tab-delimitted)
 '''
@@ -218,7 +223,7 @@ def AMRScriptWriter(OLList, OGDict, Folder, Prefix, AFolder, APre, APost, Path, 
 		Line += Path+"fasta_to_phylip.py "+Folder+Prefix+Locus+"_allseqs_al.fa && "
 		Line += "raxmlHPC -s "+Folder+Prefix+Locus+"_allseqs_al.phy -n "+Prefix+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OGDict[Locus]+" -w "+Folder+"\n"
 		OutList2.append(Line)
-	Line = "cat "+OutFileName2+" | parallel --jobs "+NCores+"\n"
+	Line = "cat "+OutFileName2+" | parallel --jobs "+NCores+" --joblog "+Folder+Prefix+"parallel_log.log\n"
 	OutList1.append(Line)
 	OutFileWriting(OutFileName1, OutList1)
 	OutFileWriting(OutFileName2, OutList2)
@@ -405,7 +410,7 @@ OutFileWriting(OutFileName, OutList)
 
 #finding the loci and writing them to the files
 LPNameDict = defaultdict(dict)
-OutLocusList = [ ]
+OutLocusDict = defaultdict(list) 
 FileMovingScriptName = OutFolder+OutFilePre+"file_moving_script.sh"
 FileMovingScript = ['#! /bin/bash\n\n']
 for Locus in LPDict:
@@ -451,7 +456,7 @@ for Locus in LPDict:
 		#sys.stderr.write("%d sequences were written to the file %s.\n" % (NumSeqs, OutFileName1))
 		print("%d of these sequences were long enough to be written to the new backbone file %s.\n" % (NumGoodSeqs, OutFileName3))
 		if NumGoodSeqs != 0:
-			OutLocusList.append(Locus)
+			OutLocusDict[NumGoodSeqs].append(Locus)
 		else:
 			Line = "cp "+AlFolder+AlFilePre+Locus+AlFilePost+".fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
 			Line += "cp "+AlFolder+"RAxML_bipartitions."+AlFilePre+Locus+" "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+"\n"
@@ -463,6 +468,11 @@ for Locus in LPDict:
 		Line += "cp "+AlFolder+"RAxML_bipartitions."+AlFilePre+Locus+" "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+"\n"
 		FileMovingScript.append(Line)
 
+OutLocusList = [ ]
+for NumGoodSeqs in sorted(OutLocusDict.keys(), reverse=True):
+	if NumGoodSeqs != 0:
+		OutLocusList += OutLocusDict[NumGoodSeqs]
+		
 #writing the script to analyze the files for the good loci
 AMRScriptWriter(OutLocusList, OutGroupDict, OutFolder, OutFilePre, AlFolder, AlFilePre, AlFilePost, ScriptPath, PFileName)
 #writing the script to analyze the files for the bad loci

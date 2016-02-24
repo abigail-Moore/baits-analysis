@@ -17,6 +17,9 @@
 #version 1.1 31 Dec. 2015
 #modified so that it doesn't make trees and so that it makes a list of individuals that have
 #double sequences for some loci.
+#version 1.2 23 Feb. 2016
+#modified so that the alignments are processed in order from largest to smallest
+#***************this has not been tested*****************
 
 #format of Ambigs_per_Seq.txt (has a header line, starting with "Locus" that identifies the groups)
 '''
@@ -243,7 +246,7 @@ def AMRScriptWriter(OLList, OGDict, Folder, Prefix, AFolder, APre, APost, Path):
 	#writing the script for parallel to analyze
 	OutFileWriting(OutFileName2, OutList2)
 	Line = "chmod u+x "+OutFileName2+"\n"
-	Line += "cat "+OutFileName2+" | parallel --jobs "+NCores+" --progress\n"
+	Line += "cat "+OutFileName2+" | parallel --jobs "+NCores+" --joblog "+Folder+Prefix+"parallel_log.log\n"
 	OutList1.append(Line)
 	return OutList1
 	#This is AnalysisScript.
@@ -755,7 +758,9 @@ OutFileWriting(OutFileName, OutList)
 NumBestSeqFiles = 0
 NumAllSeqFiles = 0
 NumParalogFiles = 0
+OutLocusDict = defaultdict(list)
 for Locus in LPDict.keys():
+	NumSeqs = 0
 	#first the best sequences, because the contigs won't be added here
 	OutFileName2 = OutFolder+OutFilePre+Locus+"_combined_best.fa"
 	NumBestSeqFiles += 1
@@ -781,6 +786,7 @@ for Locus in LPDict.keys():
 			InFile = open(InFileName, 'rU')
 			for record in SeqIO.parse(InFile, "fasta"):
 				SeqIO.write(record, OutFile1, "fasta")
+				NumSeqs += 1
 			InFile.close()
 		except IOError:
 			"no sequence files for this round"
@@ -813,6 +819,7 @@ for Locus in LPDict.keys():
 			"no sequence files for this record"
 		OutFile3.close()
 	OutFile1.close()
+	OutLocusDict[NumSeqs].append(Locus)
 #output stuff about the files
 print("%d files containing the best sequences from each locus were written, with names such as %s (for potential use as backbone alignments).\n" % (NumBestSeqFiles, OutFileName2))
 sys.stderr.write("%d files containing the best sequences from each locus were written, with names such as %s (for potential use as backbone alignments).\n" % (NumBestSeqFiles, OutFileName2))
@@ -821,8 +828,13 @@ sys.stderr.write("%d files containing all of the sequences from each locus were 
 print("%d separate files for each paralog were written, with names such as %s.\n" % (NumParalogFiles, OutFileName3))
 sys.stderr.write("%d separate files for each paralog were written, with names such as %s.\n" % (NumParalogFiles, OutFileName3))
 
+OutLocusList = [ ]
+for NumSeqs in sorted(OutLocusDict.keys(), reverse=True):
+	if NumSeqs != 0:
+		OutLocusList += OutLocusDict[NumSeqs]
+
 ####Now to write a script to analyze these files.
-AnalysisScript = AMRScriptWriter(LPDict.keys(), OutGroupDict, OutFolder, OutFilePre, AlFolder, AlFilePre, AlFilePost, ScriptPath)
+AnalysisScript = AMRScriptWriter(OutLocusList, OutGroupDict, OutFolder, OutFilePre, AlFolder, AlFilePre, AlFilePost, ScriptPath)
 #concatenating the pardicts
 PDFileList = FileListMaking(InFilePath, "", "", FileGroupDict, "_pardict.txt")
 Line = "cat "+" ".join(PDFileList)+" "+ParDictFileName+" > "+OutFolder+OutFilePre+"pardict_new.txt\n"
