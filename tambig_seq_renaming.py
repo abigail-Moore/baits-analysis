@@ -258,7 +258,7 @@ os.popen(OutLine,'r')
 #rename NewPar to NewPar_old.fa
 #move the sequences from the OldPar to the NewPar files (probably best to align the new sequences to the (old) NewPar instead of aligning everything)
 #make a file with the old sequence name[tab]new sequence name to
-#rename allbest_al.fa, allover100_al.fa, allseqs_al.fa, RAxML_bestTree..._ab_ and RAxML_bestTree..._o100
+#rename allbest_al.fa, allover150_al.fa, allseqs_al.fa, RAxML_bestTree..._ab_ and RAxML_bestTree..._o150
 #copy at least .fa and the RAxML files to filename_old.extension, so that I can see what happened (if InFolder and OutFolder are the same)
 #update the ISIDict and IPDict by removing the old paralog (if everything has been classified) and adding entries to the new paralog.
 
@@ -392,25 +392,26 @@ OutFileWriting(OutFileName, OutList)
 
 
 #writing the scripts to move the files and to align the new paralog files:
+#***Note that this script does not actually seem to align the new paralog files.***
 ScriptList1 = ['#! /bin/bash\n\n']
 for Locus in RenamedLocusList:
 	if (InFolder == OutFolder) and (InFilePre == OutFilePre):
 		Line = "mv "+InFolder+InFilePre+Locus+"_allbest_al.fa "+InFolder+InFilePre+Locus+"_allbest_al_old.fa\n"
 		Line += "mv "+InFolder+InFilePre+Locus+"_allseqs_al.fa "+InFolder+InFilePre+Locus+"_allseqs_al_old.fa\n"
-		Line += "mv "+InFolder+"RAxML_bipartitions."+InFilePre+"o100_"+Locus+" "+InFolder+"RAxML_bipartitions."+InFilePre+"o100_"+Locus+"_old\n"
+		Line += "mv "+InFolder+"RAxML_bipartitions."+InFilePre+"o150_"+Locus+" "+InFolder+"RAxML_bipartitions."+InFilePre+"o150_"+Locus+"_old\n"
 		Line += "mv "+InFolder+"RAxML_bipartitions."+InFilePre+"ab_"+Locus+" "+InFolder+"RAxML_bipartitions."+InFilePre+"ab_"+Locus+"_old\n"
 		ScriptList1.append(Line)
 		Line = ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allbest_al_old.fa "+OutFolder+OutFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
 		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allseqs_al_old.fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
-		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allover100_al_old.fa "+OutFolder+OutFilePre+Locus+"_allover100_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
-		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"o100_"+Locus+"_old "+OutFolder+"RAxML_bipartitions."+OutFilePre+"o100_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allover150_al_old.fa "+OutFolder+OutFilePre+Locus+"_allover150_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"o150_"+Locus+"_old "+OutFolder+"RAxML_bipartitions."+OutFilePre+"o150_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
 		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"ab_"+Locus+"_old "+OutFolder+"RAxML_bipartitions."+OutFilePre+"ab_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
 		ScriptList1.append(Line)
 	else:
 		Line = ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
 		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
-		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allover100_al.fa "+OutFolder+OutFilePre+Locus+"_allover100_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
-		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"o100_"+Locus+" "+OutFolder+"RAxML_bipartitions."+OutFilePre+"o100_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+InFilePre+Locus+"_allover150_al.fa "+OutFolder+OutFilePre+Locus+"_allover150_al.fa "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
+		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"o150_"+Locus+" "+OutFolder+"RAxML_bipartitions."+OutFilePre+"o150_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
 		Line += ScriptPath+"treerenamer.py "+InFolder+"RAxML_bipartitions."+InFilePre+"ab_"+Locus+" "+OutFolder+"RAxML_bipartitions."+OutFilePre+"ab_"+Locus+" "+OutFolder+OutFilePre+Locus+"_renaming_key.txt\n"
 		ScriptList1.append(Line)
 OutFileName1 = OutFolder+OutFilePre+"seq_renaming_script.sh"

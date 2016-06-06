@@ -36,6 +36,7 @@ from Bio.Alphabet import IUPAC #to recognize sequences
 from Bio.SeqRecord import SeqRecord #to make strings into sequence objects
 from Bio.Align import MultipleSeqAlignment
 from Bio.Align import AlignInfo
+import subprocess #We want to be able to talk to the command line.
 
 Usage = '''
 tparcomb_final.py combines multiple sequences from the same paralog for some individuals
@@ -52,17 +53,20 @@ alignments and other files.
 [outgroup dictionary]
 [dictionary saying which group each individual belongs to]
 [number of cores for parallelization]
+[mode: Parallel or Array]
 '''
 
 '''
-tparcomb_final.py InFilePath InFileGroupList IndDictFileName OutGroupDictFN ContigFolder ContigFilePre OutFolder OutFilePre AlFolder AlFilePre AlFilePost ScriptPath OutGroupDictFN IndDictFileName NCores
-/gpfs/scratch/ajm3/eedwards/scripts/tparcomb_final.py /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_combined Ln1tcb_ /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_final Ln1tfi_ /gpfs/scratch/ajm3/eedwards/scripts/ /gpfs/scratch/ajm3/eedwards/general/combined_trees/ new_ _al /gpfs/scratch/ajm3/eedwards/general/outgroup_list_new.txt /gpfs/scratch/ajm3/eedwards/general/Ln1_inds2.txt 4
+tparcomb_final.py InFilePath InFileGroupList IndDictFileName OutGroupDictFN ContigFolder ContigFilePre OutFolder OutFilePre AlFolder AlFilePre AlFilePost ScriptPath OutGroupDictFN IndDictFileName NCores Mode[Parallel, Array]
+/gpfs/scratch/ajm3/eedwards/scripts/tparcomb_final.py /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_combined Ln1tcb_ /gpfs/scratch/ajm3/eedwards/Ln1_testing/Ln1t_final Ln1tfi_ /gpfs/scratch/ajm3/eedwards/scripts/ /gpfs/scratch/ajm3/eedwards/general/combined_trees/ new_ _al /gpfs/scratch/ajm3/eedwards/general/outgroup_list_new.txt /gpfs/scratch/ajm3/eedwards/general/Ln1_inds2.txt 4 Parallel
 '''
 
 print("%s\n" % (" ".join(sys.argv)))
 
-if len(sys.argv) != 12:
-	sys.exit("ERROR!  This script requires 11 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
+ModeList = ['Parallel', 'Array']
+
+if len(sys.argv) != 13:
+	sys.exit("ERROR!  This script requires 12 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
 InFolder = sys.argv[1]
 if InFolder[-1] != "/":
 	InFolder += "/"
@@ -92,6 +96,11 @@ if AlFilePost == "none":
 OutGroupDictFN = sys.argv[9]
 IndDictFileName = sys.argv[10]
 NCores = sys.argv[11]
+Mode = sys.argv[12]
+if Mode not in ModeList:
+	sys.exit("ERROR!!  You wanted the mode %s, but the mode must be one of the following: %s.\n%s" % (Mode, ", ".join(ModeList), Usage))
+
+#####################################################################################
 
 #SeqFileReading reads a sequence file and puts the sequences in a dictionary.
 def SeqFileReading(FileName, SeqFormat):
@@ -319,8 +328,10 @@ for Locus in RedoList:
 				IndSeqList = [ ]
 				NameTemp = Ind+"."+Paralog
 				for SeqName in LocusSeqDict:
-					if SeqName[:len(NameTemp)] == NameTemp:
-						IndSeqList.append(SeqName)
+					SplitSeqName = SeqName.split(".")
+					if len(SplitSeqName) > 2:
+						if (SplitSeqName[0]+"."+SplitSeqName[1]) == NameTemp:
+							IndSeqList.append(SeqName)
 				(ConSeq, NumAmbig, AmbigSitesList, NumSeqs, Overlap) = ConSeqMaker(LocusSeqDict,IndSeqList)
 				#keep the sequence, if there are few enough ambiguities
 				if NumAmbig < 5:
@@ -420,7 +431,7 @@ for Locus in NewSeqDict:
 HeaderDDPrinting(ISIDict, "Locus", "Paralog", IndList, OutFolder+OutFilePre+"Ind_Seq_Info.txt")
 HeaderDDPrinting(IPDict, "Locus", "Paralog", IndList, OutFolder+OutFilePre+"Seqs_per_Paralog.txt")
 
-#making new sequence files with all sequences that are over 100bp
+#making new sequence files with all sequences that are over 150bp
 OutLocusDict = defaultdict(list)
 for Locus in ISIDict:
 	NumSeqs = 0
@@ -428,18 +439,18 @@ for Locus in ISIDict:
 		InFileName = OutFolder+OutFilePre+Locus+"_allseqs.fa"
 	else:
 		InFileName = InFolder+InFilePre+Locus+"_allseqs_al.fa"
-	OutFileName = OutFolder+OutFilePre+Locus+"_allover100.fa"
+	OutFileName = OutFolder+OutFilePre+Locus+"_allover150.fa"
 	InFile = open(InFileName, 'rU')
 	OutFile = open(OutFileName, 'w')
 	for record in SeqIO.parse(InFile, "fasta"):
 		NumSeqs += 1
-		if len(str(record.seq).replace("-","")) > 100:
+		if len(str(record.seq).replace("-","")) > 150:
 			SeqIO.write(record, OutFile, "fasta")
 	InFile.close()
 	OutFile.close()
 	OutLocusDict[NumSeqs].append(Locus)
-print("%d sequence files that only contain the sequences that are longer than 100 bp were written, with names such as %s.\n" % (len(ISIDict.keys()), OutFileName))
-sys.stderr.write("%d sequence files that only contain the sequences that are longer than 100 bp were written, with names such as %s.\n" % (len(ISIDict.keys()), OutFileName))
+print("%d sequence files that only contain the sequences that are longer than 150 bp were written, with names such as %s.\n" % (len(ISIDict.keys()), OutFileName))
+sys.stderr.write("%d sequence files that only contain the sequences that are longer than 150 bp were written, with names such as %s.\n" % (len(ISIDict.keys()), OutFileName))
 
 
 #updating pardict
@@ -498,60 +509,120 @@ OutLocusList = [ ]
 for NumSeqs in sorted(OutLocusDict.keys(), reverse=True):
 	if NumSeqs != 0:
 		OutLocusList += OutLocusDict[NumSeqs]
-
-OutList1 = ['#! /bin/bash\n']
-OutFileName1 = OutFolder+OutFilePre+"Locus_Analysis_Subscript1.sh"
-OutList2 = ['#! /bin/bash\n']
-OutFileName2 = OutFolder+OutFilePre+"Locus_Analysis_Subscript2.sh"
-OutList3 = ['#! /bin/bash\n']
-OutFileName3 = OutFolder+OutFilePre+"Locus_Analysis_Script.sh"
-for Locus in OutLocusList:
-	#if we don't need to add any new sequences to that locus
-	if (Locus in RedoneDict.keys()) == False:
-		Line = 'cp '+InFolder+InFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_allbest_al.fa "
-		Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allbest_al.fa\n"
-		Line += 'cp '+InFolder+InFilePre+Locus+"_allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa "
-		Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
-		Line += "mv "+OutFolder+OutFilePre+Locus+"_allover100.fa "+OutFolder+OutFilePre+Locus+"_allover100_al.fa  "
-		Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allover100_al.fa\n"
-		OutList1.append(Line)
-		#and the paralogs
-		for Paralog in LPDict[Locus]:
-			if Paralog[:5] != "Ambig":
-				Line = 'cp '+InFolder+InFilePre+Locus+"_"+Paralog+".fa "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa "
-				Line += "&& mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Paralog+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+Paralog+"_al.fa\n"
-				OutList1.append(Line)
-	#if we do need to add new sequences to that locus
-	else:
-		Line = "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_newseqs.fa --quiet --thread -1 "+OutFolder+OutFilePre+Locus+"_allseqs.fa > "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa "
-		Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
-		Line += "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_newseqs.fa --quiet --thread -1 "+OutFolder+OutFilePre+Locus+"_allbest.fa > "+OutFolder+OutFilePre+Locus+"_allbest_al.fa "
-		Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allbest_al.fa\n"
-		Line += "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_newseqs.fa --quiet --thread -1 "+OutFolder+OutFilePre+Locus+"_allover100.fa > "+OutFolder+OutFilePre+Locus+"_allover100_al.fa "
-		Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allover100_al.fa\n"
-		OutList1.append(Line)
-		for Paralog in LPDict[Locus]:
-			if Paralog[:5] != "Ambig":
-				if (Paralog in RedoneDict[Locus]) == False:
+if Mode == 'Parallel':
+	OutList1 = ['#! /bin/bash\n']
+	OutFileName1 = OutFolder+OutFilePre+"Locus_Analysis_Subscript1.sh"
+	OutList2 = ['#! /bin/bash\n']
+	OutFileName2 = OutFolder+OutFilePre+"Locus_Analysis_Subscript2.sh"
+	OutList3 = ['#! /bin/bash\n']
+	OutFileName3 = OutFolder+OutFilePre+"Locus_Analysis_Script.sh"
+	for Locus in OutLocusList:
+		#if we don't need to add any new sequences to that locus
+		if (Locus in RedoneDict.keys()) == False:
+			Line = 'cp '+InFolder+InFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_allbest_al.fa "
+			Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allbest_al.fa\n"
+			Line += 'cp '+InFolder+InFilePre+Locus+"_allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa "
+			Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+			Line += "mv "+OutFolder+OutFilePre+Locus+"_allover150.fa "+OutFolder+OutFilePre+Locus+"_allover150_al.fa  "
+			Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allover150_al.fa\n"
+			OutList1.append(Line)
+			#and the paralogs
+			for Paralog in LPDict[Locus]:
+				if Paralog[:5] != "Ambig":
 					Line = 'cp '+InFolder+InFilePre+Locus+"_"+Paralog+".fa "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa "
 					Line += "&& mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Paralog+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+Paralog+"_al.fa\n"
 					OutList1.append(Line)
-				else:
-					Line = "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Paralog+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+Paralog+"_al.fa\n"
-					OutList1.append(Line)
-	#These trees are just going to be used to classify the various paralogs, so I do not need to have bootstrap values
-	Line = "raxmlHPC  -f d -s "+OutFolder+OutFilePre+Locus+"_allbest_al.phy -n "+OutFilePre+"ab_"+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
-	#Line += "raxmlHPC -f d -s "+OutFolder+OutFilePre+Locus+"_allseqs_al.phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
-	Line += "raxmlHPC -f d -s "+OutFolder+OutFilePre+Locus+"_allover100_al.phy -n "+OutFilePre+"o100_"+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
-	OutList2.append(Line)
-OutFileWriting(OutFileName1, OutList1)
-Line = "chmod u+x "+OutFileName1+"\n"
-Line += "cat "+OutFileName1+" | parallel --jobs "+NCores+" --joblog "+OutFolder+OutFilePre+"parallel_log1.log\n"
-OutList3.append(Line)
-OutFileWriting(OutFileName2, OutList2)
-Line = "chmod u+x "+OutFileName2+"\n"
-Line += "cat "+OutFileName2+" | parallel --jobs "+NCores+" --joblog "+OutFolder+OutFilePre+"parallel_log2.log\n"
-OutList3.append(Line)
-OutFileWriting(OutFileName3, OutList3)
-print("The shell script for the sequences was written to %s.\n" % (OutFileName3))
-sys.stderr.write("The shell script for the sequences was written to %s.\n" % (OutFileName3))
+		#if we do need to add new sequences to that locus
+		else:
+			Line = "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_newseqs.fa --quiet --thread -1 "+OutFolder+OutFilePre+Locus+"_allseqs.fa > "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa "
+			Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+			Line += "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_newseqs.fa --quiet --thread -1 "+OutFolder+OutFilePre+Locus+"_allbest.fa > "+OutFolder+OutFilePre+Locus+"_allbest_al.fa "
+			Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allbest_al.fa\n"
+			Line += "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_newseqs.fa --quiet --thread -1 "+OutFolder+OutFilePre+Locus+"_allover150.fa > "+OutFolder+OutFilePre+Locus+"_allover150_al.fa "
+			Line += "&& "+ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allover150_al.fa\n"
+			OutList1.append(Line)
+			for Paralog in LPDict[Locus]:
+				if Paralog[:5] != "Ambig":
+					if (Paralog in RedoneDict[Locus]) == False:
+						Line = 'cp '+InFolder+InFilePre+Locus+"_"+Paralog+".fa "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa "
+						Line += "&& mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Paralog+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+Paralog+"_al.fa\n"
+						OutList1.append(Line)
+					else:
+						Line = "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Paralog+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+Paralog+"_al.fa\n"
+						OutList1.append(Line)
+		#These trees are just going to be used to classify the various paralogs, so I do not need to have bootstrap values
+		Line = "raxmlHPC  -f d -s "+OutFolder+OutFilePre+Locus+"_allbest_al.phy -n "+OutFilePre+"ab_"+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		#Line += "raxmlHPC -f d -s "+OutFolder+OutFilePre+Locus+"_allseqs_al.phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		Line += "raxmlHPC -f d -s "+OutFolder+OutFilePre+Locus+"_allover150_al.phy -n "+OutFilePre+"o150_"+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		OutList2.append(Line)
+	OutFileWriting(OutFileName1, OutList1)
+	Line = "chmod u+x "+OutFileName1+"\n"
+	Line += "cat "+OutFileName1+" | parallel --jobs "+NCores+" --joblog "+OutFolder+OutFilePre+"parallel_log1.log\n"
+	OutList3.append(Line)
+	OutFileWriting(OutFileName2, OutList2)
+	Line = "chmod u+x "+OutFileName2+"\n"
+	Line += "cat "+OutFileName2+" | parallel --jobs "+NCores+" --joblog "+OutFolder+OutFilePre+"parallel_log2.log\n"
+	OutList3.append(Line)
+	OutFileWriting(OutFileName3, OutList3)
+	print("The shell script for the sequences was written to %s.\n" % (OutFileName3))
+	sys.stderr.write("The shell script for the sequences was written to %s.\n" % (OutFileName3))
+elif Mode == "Array":
+	SBatchList = [ ]
+	for Locus in OutLocusList:
+		OutScript = ["#!/bin/bash\n"]
+		OutScript.append("#SBATCH -J "+OutFilePre+Locus+"\n")
+		OutScript.append("#SBATCH -t 12:00:00\n")
+		OutScript.append("#SBATCH -n 1\n")
+		Line = "module load mafft\nmodule load raxml\n"
+		OutScript.append(Line)
+		#if we don't need to add any new sequences to that locus
+		if (Locus in RedoneDict.keys()) == False:
+			Line = 'cp '+InFolder+InFilePre+Locus+"_allbest_al.fa "+OutFolder+OutFilePre+Locus+"_allbest_al.fa\n"
+			#Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allbest_al.fa\n"
+			Line += 'cp '+InFolder+InFilePre+Locus+"_allseqs_al.fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+			#Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+			Line += "mv "+OutFolder+OutFilePre+Locus+"_allover150.fa "+OutFolder+OutFilePre+Locus+"_allover150_al.fa\n"
+			#Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allover150_al.fa\n"
+			OutScript.append(Line)
+			'''
+			#and the paralogs--but we don't use these at all.
+			for Paralog in LPDict[Locus]:
+				if Paralog[:5] != "Ambig":
+					Line = 'cp '+InFolder+InFilePre+Locus+"_"+Paralog+".fa "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa\n"
+					Line += "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Paralog+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+Paralog+"_al.fa\n"
+					OutScript.append(Line)
+			'''
+		#if we do need to add new sequences to that locus
+		else:
+			Line = "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_newseqs.fa --quiet --thread -1 "+OutFolder+OutFilePre+Locus+"_allseqs.fa > "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+			#Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+			Line += "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_newseqs.fa --quiet --thread -1 "+OutFolder+OutFilePre+Locus+"_allbest.fa > "+OutFolder+OutFilePre+Locus+"_allbest_al.fa\n"
+			#Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allbest_al.fa\n"
+			Line += "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_newseqs.fa --quiet --thread -1 "+OutFolder+OutFilePre+Locus+"_allover150.fa > "+OutFolder+OutFilePre+Locus+"_allover150_al.fa\n"
+			#Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allover150_al.fa\n"
+			OutScript.append(Line)
+			for Paralog in LPDict[Locus]:
+				if Paralog[:5] != "Ambig":
+					if (Paralog in RedoneDict[Locus]) == False:
+						Line = 'cp '+InFolder+InFilePre+Locus+"_"+Paralog+".fa "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa\n"
+						Line += "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Paralog+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+Paralog+"_al.fa\n"
+						OutScript.append(Line)
+					else:
+						Line = "mafft --addfragments "+OutFolder+OutFilePre+Locus+"_"+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Paralog+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_"+Paralog+"_al.fa\n"
+						OutScript.append(Line)
+		#If these trees are just going to be used to classify the various paralogs, we do not need to have bootstrap values.
+		#But generally they will be the final trees, so we will.
+		#But, actually, we don't need anything, because we will make new trees that only have the individuals we want for further analysis.
+		#Line = "raxmlHPC  -f d -s "+OutFolder+OutFilePre+Locus+"_allbest_al.phy -n "+OutFilePre+"ab_"+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		#Line += "raxmlHPC -f d -s "+OutFolder+OutFilePre+Locus+"_allseqs_al.phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		#Line += "raxmlHPC -f d -s "+OutFolder+OutFilePre+Locus+"_allover150_al.phy -n "+OutFilePre+"o150_"+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		#Line = "raxmlHPC  -f a -s "+OutFolder+OutFilePre+Locus+"_allbest_al.phy -n "+OutFilePre+"ab_"+Locus+" -m GTRCAT -p 1234 -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		#Line += "raxmlHPC -f a -s "+OutFolder+OutFilePre+Locus+"_allover150_al.phy -n "+OutFilePre+"o150_"+Locus+" -m GTRCAT -p 1234 -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		OutScript.append(Line)
+		OutFileName = OutFolder+OutFilePre+Locus+"script.sh"
+		OutFileWriting(OutFileName, OutScript)
+		OutLine = "sbatch "+OutFileName
+		SBatchOut = subprocess.Popen(OutLine, shell=True, stdout=subprocess.PIPE).communicate()[0]
+		SBatchList.append(SBatchOut.strip('\r').strip('\n').split(" ")[-1])
+	print("%d separate scripts for alignment and tree building, one for each locus, were submitted.\n" % (len(SBatchList)))
+	sys.stderr.write("%d separate scripts for alignment and tree building, one for each locus, were submitted.\n" % (len(SBatchList)))

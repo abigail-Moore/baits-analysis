@@ -282,6 +282,8 @@ def BreakFinder(IDict, IntPercent):
 	SEBPDict = defaultdict(dict)
 	AlEnd = sorted(SEDict.keys())[-1]
 	IntervalSize = IntPercent*AlEnd
+	if IntervalSize > 98:
+		IntervalSize = 98
 	if Verbose == True: print("Starts and ends of contigs within %.2f of one another, will be considered to be starting or ending at the same breakpoint.\n" % (IntervalSize))
 	#There is also the question if I want more information in the SEDict, such as a list of contigs (the dictionary could even be the list of contigs, and
 	#the number of individuals with each break point could be the length of the list--this would eliminate the KeyError stuff, although perhaps I could use defaultdict(int) and
@@ -453,14 +455,14 @@ def SegSelector(SegDictIn, TotalGroups):
 	GSInds = MostInds - 2
 	GSOV = MostOV - 30
 	GSLongest = LongestC - 30
-	GSTotOV = MostTotOV - 100
+	GSTotOV = MostTotOV - 150
 	#determining whether each segment is above the cutoff value in any of the four categories
 	SegScoreDict = defaultdict(list)#SegScoreDict[SegNum] = list of categories in which it was near the best
 	AllGroupsList = [ ]
 	for SegNum in sorted(SegDictIn.keys()):
-		#only looking at segments with a median contig length over 100, because these are the only ones that will be in
+		#only looking at segments with a median contig length over 150, because these are the only ones that will be in
 		#the final tree
-		if SegDictIn[SegNum]['MedCLength'] >= 100:
+		if SegDictIn[SegNum]['MedCLength'] >= 150:
 			#if it has at least the minimum number of overlapping contigs:
 			if SegDictIn[SegNum]['NumContigs'] >= GSCon:
 				#adding "NumContigs" to the list of categories in which it is near the best
@@ -476,7 +478,7 @@ def SegSelector(SegDictIn, TotalGroups):
 			if SegDictIn[SegNum]['NumGroups'] == TotalGroups:
 				SegScoreDict[SegNum].append("AllGroups")
 				AllGroupsList.append(SegNum)
-	#But I guess if there are no segments with median length over 100, then we should run it again to get something.
+	#But I guess if there are no segments with median length over 150, then we should run it again to get something.
 	if SegScoreDict == { }:
 		for SegNum in sorted(SegDictIn.keys()):
 			if SegDictIn[SegNum]['NumContigs'] >= GSCon:

@@ -1,11 +1,9 @@
 #! /usr/bin/env python
 
-#tblast_to_fastq.py version 1.0 10 March 2015
+#tblast_to_fasta_qual.py version 1.0 27 March 2015
 #This script reads the Seqs_to_Loci.txt output 
 #from tbaits_blastn_parse.py or tbaits_blast_parse.py
 #and writes files for each locus for each individual.
-#version 1.1 23 Feb. 2016, outscript parallelized
-
 #It expects file with the header:
 #Locus_Name	Individual_Name	Number_of_Hits	Sequence_Names
 #and subsequent lines like (tab-delimited):
@@ -15,6 +13,8 @@
 #[2]: number of BLAST hits these sequences had
 #[3]: semi-colon-delimited list of sequence names (from fasta file)
 #These sequence names will need to be converted to the actual sequence names in the BLAST file to find the sequences
+#It writes one file with the sequences and one with the phred scores, as well
+#as a script for the Minimo analysis.
 
 import sys #to talk to the command line
 from collections import defaultdict #to make dictionaries with multiple levels
@@ -22,37 +22,66 @@ import gzip #We want to be able to open zipped files.
 from itertools import izip #We want to be able to look at two files simultaneously (without having to
 #have them both fully in memory at the same time
 
-#examples
-'''
-tblast_to_fastq.py InFileName SeqFolder SeqFilePre OutFolder OutFilePre OutMode[together separate]
-'''
+#Example
+#tblast_to_fasta_qual.py ~/transcriptomes/TS27_2015_01_26/TS27_MiSeq_Inds_Copy/o2_Seqs_to_Loci.txt ~/transcriptomes/TS27_2015_01_26/TS27_MiSeq_Inds/ t_ ~/transcriptomes/TS27_2015_01_26/TS27_MiSeq_Inds_Copy/blast_hits_Min/ b5_ separate qual
+#tblast_to_fasta_qual.py InFileName SeqFolder SeqFilePre OutFolder OutFilePre OutMode [together, separate]
 
 Usage ='''
-tblast_to_fastq.py version 1.0 makes new fastq files for individual loci from
-the blast output parsed by tbaits_blastn_parse.py or tbaits_blast_parse.py
+tblast_to_fasta_qual.py version 1.0 makes new fasta files for individual loci
+as well as separate files with the phred scores from the blast output parsed by 
+tbaits_blastn_parse.py or tbaits_blast_parse.py, as well as a Minimo script
+for analysis of these files:
 tblast_to_fastq.py [infile name] [sequence folder] [prefix for sequence files]
 [out folder] [out file prefix or "none" for none]
 [mode: "together" if all reads for the same locus should be analyzed together, 
 even if they come from different individuals or "separate" if reads for each locus
-should be analyzed separately for the different individuals]
-'''
+should be analyzed separately for the different individuals] '''
 
 print ("%s\n" % (" ".join(sys.argv)))
 
-if len(sys.argv) < 7:
-	sys.exit("Error!!  tblast_to_fastq.py requires 7-8 additional arguments and you supplied %d.  %s" % (len(sys.argv)-1, Usage))
+if len(sys.argv) != 8:
+	sys.exit("ERROR!  This script requires 8 additional arguments and you supplied %d.\n%s" % (len(sys.argv)-1, Usage))
+InFileName = sys.argv[1]
+SeqFolder = sys.argv[2]
+SeqFilePre = sys.argv[3]
+OutFolder = sys.argv[4]
+if sys.argv[5] == "none":
+	OutFilePre = ""
 else:
-	InFileName = sys.argv[1]
-	SeqFolder = sys.argv[2]
-	SeqFilePre = sys.argv[3]
-	OutFolder = sys.argv[4]
-	if sys.argv[5] == "none":
-		OutFilePre = ""
-	else:
-		OutFilePre = sys.argv[5]
-	OutMode = sys.argv[6]
-	if (OutMode != "together") and (OutMode != "separate"):
-		sys.exit("The output mode can only be 'together' or 'separate', but you wrote %s.\n" % (OutMode))
+	OutFilePre = sys.argv[5]
+OutMode = sys.argv[6]
+if (OutMode != "together") and (OutMode != "separate"):
+	sys.exit("The output mode can only be 'together' or 'separate', but you wrote %s.\n" % (OutMode))
+NCores = sys.argv[7]
+
+######################################################################################
+
+#OrderedListMaking makes a list in which objects are arranged in descending 
+#(if Rev == True) or ascending (if Rev == False) order
+#It takes a dictionary with DictTemp[Thing] = Size
+#original
+def OrderedListMaking(DictTemp, Rev):
+	DictbySize = defaultdict(list)
+	for Thing in DictTemp:
+		Size = DictTemp[Thing]
+		DictbySize[Size].append(Thing)
+	ListTemp = [ ]#list of Things in descending order of size
+	for Size in sorted(DictbySize.keys(), reverse = Rev):
+		ListTemp += DictbySize[Size]
+	return(ListTemp)
+
+#OutFileWriting writes an output file from a list of lines to write.
+#The lines must already have "\n" at the end.
+#from tbaits_intron_removal.py
+def OutFileWriting(FileName, MyList):
+	OutFile = open(FileName, 'w')
+	for Line in MyList:
+		OutFile.write(Line)
+	OutFile.close()
+	print("Output file %s written.\n" % (FileName))
+	sys.stderr.write("Output file %s written.\n" % (FileName))
+
+######################################################################################
 
 if SeqFolder[-1] != "/":
 	SeqFolder += "/"
@@ -64,16 +93,14 @@ OutScriptDict = defaultdict(dict) #The dictionary that will be used to make the 
 InFile = open(InFileName, 'rU')
 for Line in InFile:
 	Line = Line.strip('\n').strip('\r').split('\t')
-	#for all reads, even if they had multiple blast hits
-	#if Line[0] != "Locus_Name":
-	#for only the reads that had one blast hit
-	if (Line[0] != "Locus_Name") and (Line[2] == "1"):
+	if Line[0] != "Locus_Name":
 		Locus = Line[0]
 		Ind = Line[1]
 		SeqList = Line[3].split(';')
 		for SeqName in SeqList:
 			SeqName = SeqName.split("_")
-			SeqName = "_".join(SeqName[-3:])
+			SeqName = "_".join(SeqName[-3:])#This is the version for normal files
+			#SeqName = "_".join(SeqName[-4:-1])#This is the version for TS27_1
 			SeqNameDict[Ind][SeqName] = Locus
 InFile.close()
 
@@ -83,6 +110,7 @@ IndList = sorted(IndList)
 print("Information on sequences from %d individuals was read from the file %s.\n" % (len(IndList), InFileName))
 sys.stderr.write("Information on sequences from %d individuals was read from the file %s.\n" % (len(IndList), InFileName))
 
+NumLocusSeqs = defaultdict(int)#NumLocusSeqs[Locus] = NumSeqs
 #for each individual at once:
 #read fastq files and make defaultdict indseqs[seqname]['R1' or 'R2'] = fastq sequence
 #while doing this, check both sequences to see if they are entirely Ns, in which case
@@ -92,6 +120,10 @@ for Ind in IndList:
 	IndSeqs['R1'] = defaultdict(dict)
 	IndSeqs['R2'] = defaultdict(dict)
 	IndSeqs['S'] = defaultdict(dict)
+	IndQuals = defaultdict(dict) #dictionary of quality scores for those sequences
+	IndQuals['R1'] = defaultdict(dict)
+	IndQuals['R2'] = defaultdict(dict)
+	IndQuals['S'] = defaultdict(dict)
 	BothGood = 0
 	OneGood = 0
 	BothBad = 0
@@ -117,8 +149,7 @@ for Ind in IndList:
 			try:
 				Locus = SeqNameDict[Ind][SeqName]
 				SeqWanted = True
-				Seq1 = Line1 + "\n"
-				Seq2 = Line2 + "\n"
+				NumLocusSeqs[Locus] += 1
 			except KeyError:
 				SeqWanted = False
 		#check to see if the sequences are mainly Ns
@@ -128,39 +159,49 @@ for Ind in IndList:
 				Seq1 = "error"
 				Seq1Good = False
 			else:
-				Seq1 += Line1 + "\n"
+				#If not, add the sequence to the dictionary.
+				Seq1 = Line1
 				Seq1Good = True
 			NumNs2 = Line2.count('N')
 			if NumNs2 > 3:
 				Seq2 = "error"
 				Seq2Good = False
 			else:
-				Seq2 += Line2 + "\n"
+				Seq2 = Line2
 				Seq2Good = True
-		#add the third line
-		elif (SeqLine == 2) and (SeqWanted == True):
-			Seq1 += Line1 + "\n"
-			Seq2 += Line2 + "\n"
+		#skip the third line
 		#add the fourth line
 		elif (SeqLine == 3) and (SeqWanted == True):
-			Seq1 += Line1 + "\n"
-			Seq2 += Line2 + "\n"
+			Line1P = list(Line1)
+			Line1N = [ ]
+			for Num in Line1P:
+				Line1N.append(str(ord(Num)))
+			Line1 = " ".join(Line1N)			
+			Line2P = list(Line2)
+			Line2N = [ ]
+			for Num in Line2P:
+				Line2N.append(str(ord(Num)))
+			Line2 = " ".join(Line2N)
 			#check to see if we want the sequence before adding it to the dictionary of sequences to be written
 			if (Seq1Good == True) and (Seq2Good == True):
 				IndSeqs['R1'][Locus][SeqName] = Seq1
 				IndSeqs['R2'][Locus][SeqName] = Seq2
+				IndQuals['R1'][Locus][SeqName] = Line1
+				IndQuals['R2'][Locus][SeqName] = Line2
 				BothGood += 1
 			elif (Seq1Good == True) and (Seq2Good == False):
 				IndSeqs['S'][Locus][SeqName] = Seq1
+				IndQuals['S'][Locus][SeqName] = Line1
 				OneGood += 1
 			elif (Seq1Good == False) and (Seq2Good == True):
 				IndSeqs['S'][Locus][SeqName] = Seq2
+				IndQuals['S'][Locus][SeqName] = Line2
 				OneGood += 1
 			else:
 				BothBad += 1
 		LineNum += 1
 	InFile1.close()
-	InFile2.close()
+	InFile2.close()			
 	print("%s had %d sequences where both reads were good,\n" % (Ind, BothGood))
 	print("%d sequences where one read was good, and %d sequences where\n" % (OneGood, BothBad))
 	print("neither read was good, out of %d total blast hits.\n" % (len(SeqNameDict[Ind].keys())))
@@ -171,95 +212,72 @@ for Ind in IndList:
 	NumFiles = 0
 	for Locus in IndSeqs['R1']:
 		if OutMode == "separate":
-			OutFileName1 = OutFolder+OutFilePre+Locus+"_"+Ind+"_R1.fastq" 
+			OutFileName1 = OutFolder+OutFilePre+Locus+"_"+Ind+"_seqs.fa" 
 			OutFile1 = open(OutFileName1, 'w')		
-			OutFileName2 = OutFolder+OutFilePre+Locus+"_"+Ind+"_R2.fastq" 
+			OutFileName2 = OutFolder+OutFilePre+Locus+"_"+Ind+"_phred.txt" 
 			OutFile2 = open(OutFileName2, 'w')
 			OutScriptDict[Locus][Ind]=[OutFileName1, OutFileName2]
 		elif OutMode == "together":
-			OutFileName1 = OutFolder+OutFilePre+Locus+"_R1.fastq" 
+			OutFileName1 = OutFolder+OutFilePre+Locus+"_seqs.fa" 
 			OutFile1 = open(OutFileName1, 'a')		
-			OutFileName2 = OutFolder+OutFilePre+Locus+"_R2.fastq" 
+			OutFileName2 = OutFolder+OutFilePre+Locus+"_phred.txt" 
 			OutFile2 = open(OutFileName2, 'a')
-			OutScriptDict[Locus]["R1_R2"] = [OutFileName1, OutFileName2] 
+			OutScriptDict[Locus] = [OutFileName1, OutFileName2] 
 		for SeqName in IndSeqs['R1'][Locus]:
-			OutFile1.write(IndSeqs['R1'][Locus][SeqName])
-			OutFile2.write(IndSeqs['R2'][Locus][SeqName])
+			OutLine1 = ">"+Ind+"_"+SeqName+"\n"+IndSeqs['R1'][Locus][SeqName]+"\n"
+			OutFile1.write(OutLine1)
+			OutLine1 = ">"+Ind+"_"+SeqName+"\n"+IndSeqs['R2'][Locus][SeqName]+"\n"
+			OutFile1.write(OutLine1)
+			OutLine2 = ">"+Ind+"_"+SeqName+"\n"+IndQuals['R1'][Locus][SeqName]+"\n"
+			OutFile2.write(OutLine2)
+			OutLine2 = ">"+Ind+"_"+SeqName+"\n"+IndQuals['R2'][Locus][SeqName]+"\n"
+			OutFile2.write(OutLine2)
+		try:
+			for SeqName in IndSeqs['S'][Locus]:
+				OutLine1 = ">"+Ind+"_"+SeqName+"\n"+IndSeqs['S'][Locus][SeqName]+"\n"
+				OutFile1.write(OutLine1)
+				OutLine2 = ">"+Ind+"_"+SeqName+"\n"+IndQuals['S'][Locus][SeqName]+"\n"
+				OutFile2.write(OutLine2)
+		except KeyError:
+			"do nothing"
 		OutFile1.close()
 		OutFile2.close()
 		NumFiles += 2
-	for Locus in IndSeqs['S']:
-		if OutMode == "separate":
-			OutFileNameS = OutFolder+OutFilePre+Locus+"_"+Ind+"_S.fastq" 
-			OutFileS = open(OutFileNameS, 'w')
-			try:
-				OutScriptDict[Locus][Ind].append(OutFileNameS)
-			except KeyError:
-				OutScriptDict[Locus][Ind] = [OutFileNameS]
-		elif OutMode == "together":
-			OutFileNameS = OutFolder+OutFilePre+Locus+"_S.fastq" 
-			OutFileS = open(OutFileNameS, 'a')
-			OutScriptDict[Locus]['S'] = [OutFileNameS]
-		for SeqName in IndSeqs['S'][Locus]:
-			OutFileS.write(IndSeqs['S'][Locus][SeqName])
-		OutFileS.close()
-		NumFiles += 1
-	print("Sequences were written to %d files, with names such as %s.\n" % (NumFiles, OutFileName1))
-	sys.stderr.write("Sequences were written to %d files, with names such as %s.\n" % (NumFiles, OutFileName1))
+	print("Sequences were written to %d fasta and quality score files, with \nnames such as %s and %s.\n" \
+	% (NumFiles, OutFileName1, OutFileName2))
+	sys.stderr.write("Sequences were written to %d fasta and quality score files, with \nnames such as %s and %s.\n" \
+	% (NumFiles, OutFileName1, OutFileName2))
 
-#Making a script to analyze the sequences using Spades:
+#Making a script to analyze the sequences using Minimo:
+#first ordering the loci by the number of reads they have
+OutLocusList = OrderedListMaking(NumLocusSeqs, True)
+#then writing the script with the largest loci first
 OutScript1 = [ "#! /bin/bash\n\n" ]
 OutScript2 = [ ]
-for Locus in OutScriptDict.keys():
-	Line = "mkdir "+OutFolder+Locus+"\n"
-	OutScript1.append(Line)
+for Locus in OutLocusList:
 	if OutMode == "separate":
 		for Ind in OutScriptDict[Locus]:
-			OutFolderName = OutFolder+Locus+"/"+Ind
-			Line = "mkdir "+OutFolderName+"\n"
-			OutScript1.append(Line)
-			if len(OutScriptDict[Locus][Ind]) == 2:
-				Line = "spades.py -o "+OutFolderName+" --pe1-1 "+OutScriptDict[Locus][Ind][0]+" --pe1-2 "+OutScriptDict[Locus][Ind][1]+" -t 4 -m 64\n"
-				OutScript2.append(Line)
-			elif len(OutScriptDict[Locus][Ind]) == 3:
-				Line = "spades.py -o "+OutFolderName+" --pe1-1 "+OutScriptDict[Locus][Ind][0]+" --pe1-2 "+OutScriptDict[Locus][Ind][1]+" --pe1-s "+OutScriptDict[Locus][Ind][2]+" -t 4 -m 64\n"
-				OutScript2.append(Line)
-			elif len(OutScriptDict[Locus][Ind]) == 1:
-				Line = "spades.py -o "+OutFolderName+" --pe1-s "+OutScriptDict[Locus][Ind][0]+" -t 4 -m 64\n"
-				OutScript2.append(Line)
+			Line = "Minimo "+OutScriptDict[Locus][Ind][0]+" -D QUAL_IN="+OutScriptDict[Locus][Ind][1]+" -D FASTA_EXP=1 -D MIN_LEN=40 -D MIN_IDENT=90\n"
+			OutScript2.append(Line)
 	elif OutMode == "together":
-		OutFolderName = OutFolder+Locus+"/together"
-		Line = "mkdir "+OutFolderName+"\n"
-		OutScript1.append(Line)
-		try:
-			Line = "spades.py -o "+OutFolderName+" --pe1-1 "+OutScriptDict[Locus]['R1_R2'][0]+" --pe1-2 "+OutScriptDict[Locus]['R1_R2'][1]+" --pe1-s "+OutScriptDict[Locus]['S'][0]+" -t 4 -m 64\n"
-			OutScript2.append(Line)
-		except KeyError:
-			Line = "spades.py -o "+OutFolderName+" --pe1-1 "+OutScriptDict[Locus]['R1_R2'][0]+" --pe1-2 "+OutScriptDict[Locus]['R1_R2'][1]+" -t 4 -m 64\n"
-			OutScript2.append(Line)
+		Line = "Minimo "+OutScriptDict[Locus][0]+" -D QUAL_IN="+OutScriptDict[Locus][1]+" -D FASTA_EXP=1 -D MIN_LEN=40 -D MIN_IDENT=90\n"
+		OutScript2.append(Line)
 
-OutFileName1 = OutFolder+"spades_script_"+OutMode+"1.sh"
-OutFileName2 = OutFolder+"spades_script_"+OutMode+"2.sh"
+OutFileName1 = OutFolder+"minimo_script_"+OutMode+"1.sh"
+OutFileName2 = OutFolder+"minimo_script_"+OutMode+"2.sh"
 
-Line = "cat "+OutFileName2+" | parallel --joblog "+OutFolder+"parallel_log.log\n"
+Line = "cat "+OutFileName2+" | parallel --jobs "+NCores+" --joblog "+OutFolder+"parallel_log.log\n"
 OutScript1.append(Line)
 
-OutFile = open(OutFileName1, 'w')
-for Line in OutScript1:
-	OutFile.write(Line)
-OutFile.close()
-OutFile = open(OutFileName2, 'w')
-for Line in OutScript2:
-	OutFile.write(Line)
-OutFile.close()
-
+OutFileWriting(OutFileName1, OutScript1)
+OutFileWriting(OutFileName2, OutScript2)
 
 if OutMode == "separate":
-	print("The shell script to analyze the individuals separately using spades is %s.\n" % (OutFileName1))
-	sys.stderr.write("The shell script to analyze the individuals separately using spades is %s.\n" % (OutFileName1))
+	print("The shell script to analyze the individuals separately using Minimo is %s.\n" % (OutFileName1))
+	sys.stderr.write("The shell script to analyze the individuals separately using Minimo is %s.\n" % (OutFileName1))
 elif OutMode == "together":
-	print("The shell script to analyze the all individuals together using spades is %s.\n" % (OutFileName1))
-	sys.stderr.write("The shell script to analyze the all individuals together using spades is %s.\n" % (OutFileName1))
+	print("The shell script to analyze the all individuals together using Minimo is %s.\n" % (OutFileName1))
+	sys.stderr.write("The shell script to analyze the all individuals together using Minimo is %s.\n" % (OutFileName1))
 
 LocusList = OutScriptDict.keys()
 LocusList = sorted(LocusList)
@@ -267,10 +285,7 @@ LocusList = sorted(LocusList)
 OutFileName = OutFolder+OutFilePre+"Locus_List.txt"
 OutFile = open(OutFileName, 'w')
 for Locus in LocusList:
-	if OutMode == "separate":
-		Line = Locus+"\t"+",".join(OutScriptDict[Locus].keys())+"\n"
-	elif OutMode == "together":
-		Line = Locus+"\ttogether\n"
+	Line = Locus+"\t"+",".join(OutScriptDict[Locus].keys())+"\n"
 	OutFile.write(Line)
 OutFile.close()
 

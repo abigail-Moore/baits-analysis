@@ -398,15 +398,18 @@ def OutFileWriting(FileName, MyList):
 #the contigs that couldn't be assembled to the new alignment and places them in the new tree.
 def MRScriptWriter(SeqFileDict, OutGDict, Folder, Prefix, AFolder, APre, APost, Path, Prefix2):
 	OutList = ["#! /bin/bash\n"]
+	OutList2 = [ ]
 	for Locus in SeqFileDict:
-		Line = "rm "+Folder+Prefix+Locus+"_exons_al.fa\n"
+		Line = "rm "+Folder+Prefix+Locus+"_exons_al.fa && "
 		Line += "rm "+Folder+"RAxML*"+Prefix+Locus+"\n"
-		#Line += "if test -f '"+AFolder+APre+Locus+APost+".fa'; then mafft --addfragments "+Folder+Prefix+Locus+".fa --quiet --thread -1 "+AFolder+APre+Locus+APost+".fa > "+Folder+Prefix+Locus+"_exons_al.fa; else cp "+Folder+Prefix2+Locus+".fa "+Folder+Prefix+Locus+".fa; fi\n"
-		Line += "mafft --addfragments "+Folder+Prefix+Locus+".fa --quiet --thread -1 "+AFolder+APre+Locus+APost+".fa > "+Folder+Prefix+Locus+"_exons_al.fa\n"
-		Line += Path+"fasta_to_phylip.py "+Folder+Prefix+Locus+"_exons_al.fa\n"
-		#Line += "if test -f '"+AFolder+"RAxML_bipartitions."+APre+Locus+"'; then raxmlHPC -f v -s "+Folder+Prefix+Locus+"_exons_al.phy -n "+Prefix+Locus+" -t "+AFolder+"RAxML_bipartitions."+APre+Locus+" -m GTRCAT -o "+OutGDict[Locus]+" -w "+Folder+"; else cp "+Folder+"RAxML_originalLabelledTree."+Prefix2+Locus+" "+Folder+"RAxML_originalLabelledTree."+Prefix+Locus+" && cp "+Folder+"RAxML_classificationLikelihoodWeights."+Prefix2+Locus+" "+Folder+"RAxML_classificationLikelihoodWeights."+Prefix+Locus+"; fi\n"
-		Line += "raxmlHPC -f v -s "+Folder+Prefix+Locus+"_exons_al.phy -n "+Prefix+Locus+" -t "+AFolder+"RAxML_bipartitions."+APre+Locus+" -m GTRCAT -o "+OutGDict[Locus]+" -w "+Folder+"\n"
 		OutList.append(Line)
+		#Line += "if test -f '"+AFolder+APre+Locus+APost+".fa'; then mafft --addfragments "+Folder+Prefix+Locus+".fa --quiet --thread -1 "+AFolder+APre+Locus+APost+".fa > "+Folder+Prefix+Locus+"_exons_al.fa; else cp "+Folder+Prefix2+Locus+".fa "+Folder+Prefix+Locus+".fa; fi && "
+		Line = "mafft --addfragments "+Folder+Prefix+Locus+".fa --quiet --thread -1 "+AFolder+APre+Locus+APost+".fa > "+Folder+Prefix+Locus+"_exons_al.fa && "
+		Line += Path+"fasta_to_phylip.py "+Folder+Prefix+Locus+"_exons_al.fa && "
+		#Line += "if test -f '"+AFolder+"RAxML_bipartitions."+APre+Locus+"'; then raxmlHPC -f v -s "+Folder+Prefix+Locus+"_exons_al.phy -n "+Prefix+Locus+" -t "+AFolder+"RAxML_bipartitions."+APre+Locus+" -m GTRCAT -o "+OutGDict[Locus]+" -w "+Folder+"; else cp "+Folder+"RAxML_originalLabelledTree."+Prefix2+Locus+" "+Folder+"RAxML_originalLabelledTree."+Prefix+Locus+" && cp "+Folder+"RAxML_classificationLikelihoodWeights."+Prefix2+Locus+" "+Folder+"RAxML_classificationLikelihoodWeights."+Prefix+Locus+"; fi && "
+		Line += "raxmlHPC -f v -s "+Folder+Prefix+Locus+"_exons_al.phy -n "+Prefix+Locus+" -t "+AFolder+"RAxML_bestTree."+APre+Locus+" -m GTRCAT -o "+OutGDict[Locus]+" -w "+Folder+"\n"
+		OutList2.append(Line)
+	OutList += OutList2
 	OutFileName = Folder+Prefix+"Analysis_Script.sh"
 	OutFileWriting(OutFileName, OutList)
 	print("The shell script for analyzing the contigs that could not be assembled was written to %s.\n" % (OutFileName))

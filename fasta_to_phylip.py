@@ -18,8 +18,6 @@ if len(sys.argv) != 2:
 	sys.exit("ERROR! This script expects one additional argument, and you gave it %d arguments!  %s" % (len(sys.argv), Usage))
 InFileName = sys.argv[1]
 
-sys.stderr.write("Alignment %s will be processed.\n" % (InFileName))
-
 MyAlignment = AlignIO.read(InFileName, "fasta")
 for seq_record in MyAlignment:
 	SeqNameTemp = seq_record.id

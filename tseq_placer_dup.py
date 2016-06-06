@@ -176,7 +176,7 @@ def TreeNumReader(TFName,TreeFormat):
 		MyResult = re.search(MyRe3, TreePart)
 		DictTemp[MyResult.group(2)] = MyResult.group(1)
 	#opening the reformatted tree
-	tree1 = dendropy.Tree.get_from_string(TreeString3, schema=TreeFormat, preserve_underscores=True, as_rooted=False)
+	tree1 = dendropy.Tree.get_from_string(TreeString3, schema=TreeFormat, preserve_underscores=True)
 	#The next line prints the tree and can be uncommented, if you want to see it.
 	#print(tree1.as_ascii_plot(show_internal_node_labels=True))
 	#print len([str(node2.taxon) for node2 in tree1.leaf_nodes()])
@@ -471,17 +471,23 @@ def OutFileWriting(FileName, MyList):
 #sequences for that locus and then aligns them.
 def AMScriptWriter(SeqFileDict, Folder, Prefix, AFolder, APre, APost):
 	OutList = ["#! /bin/bash\n"]
+	OutList2 = [ ]
 	for Locus in SeqFileDict:
 		for Paralog in SeqFileDict[Locus]:
 			NamePart = SeqFileDict[Locus][Paralog]
 			Line = "rm "+Folder+NamePart+"_pars_al.fa\n"
-			Line += "mafft --addfragments "+Folder+NamePart+".fa --quiet --thread -1 "+AFolder+APre+Locus+APost+".fa > "+Folder+NamePart+"_pars_al.fa\n"
 			OutList.append(Line)
+			Line = "mafft --addfragments "+Folder+NamePart+".fa --quiet --thread -1 "+AFolder+APre+Locus+APost+".fa > "+Folder+NamePart+"_pars_al.fa\n"
+			OutList2.append(Line)
+	OutList += OutList2
 	OutFileName = Folder+Prefix+"Analysis_Script.sh"
 	OutFileWriting(OutFileName, OutList)
 	print("The shell script for analyzing the sequences further was written to %s.\n" % (OutFileName))
 	sys.stderr.write("The shell script for analyzing the sequences further was written to %s.\n" % (OutFileName))
-	
+
+###########################################################################################
+
+
 #read the names of the sequence files from blast file list read in tbaits_intron_removal.py
 LocusList = CaptureColumn(LocusFileList, 0)
 

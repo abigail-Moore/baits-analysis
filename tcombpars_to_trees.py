@@ -13,9 +13,10 @@ from Bio.Seq import Seq #to edit sequences
 from Bio import SeqIO #to read files of non-aligned sequences
 from Bio.Alphabet import IUPAC #to recognize sequences
 from Bio.SeqRecord import SeqRecord #to make strings into sequence objects
+import subprocess #We want to be able to talk to the command line.
 
 '''
-tcombpars_to_trees.py LocusListFN SpeciesTreeFN AlFolder1 AlFilePre1 AlFilePost1 AlFolder2 AlFilePre2 AlFilePost2 OutFolder OutFilePre OutFilePost ScriptPath   
+tcombpars_to_trees.py LocusListFN SpeciesTreeFN AlFolder1 AlFilePre1 AlFilePost1 AlFolder2 AlFilePre2 AlFilePost2 OutFolder OutFilePre OutFilePost ScriptPath Mode[Parallel, Array] NextScriptFN(if Mode == Array)   
 '''
 
 Usage = '''
@@ -37,12 +38,15 @@ not be tried if an alignment is found here!]
 [prefix for the output files, or "none", if none]
 [suffix for the output files, or "none", if none]
 [path to the scripts, or "none", if they are on the default path]
+[mode: Parallel or Array]
+[file name for the subsequent script, only if the mode is Array]
 '''
 
 print("%s\n" % (" ".join(sys.argv)))
+ModeList = ['Parallel', 'Array']
 
-if len(sys.argv) != 13:
-	sys.exit("ERROR!  This script requires 12 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
+if len(sys.argv) < 14:
+	sys.exit("ERROR!  This script requires 13 or 14 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
 LocusListFN = sys.argv[1]
 SpeciesTreeFN = sys.argv[2]
 AlFolder1 = sys.argv[3]
@@ -81,6 +85,11 @@ if ScriptPath[-1] != "/":
 	ScriptPath += "/"
 if ScriptPath == "none/":
 	ScriptPath = ""
+Mode = sys.argv[13]
+if Mode not in ModeList:
+	sys.exit("ERROR!!  You wanted the mode %s, but the mode must be one of the following: %s.\n%s" % (Mode, ", ".join(ModeList), Usage))
+if Mode == "Array":
+	NextScriptFN = sys.argv[14]
 
 Vociferous = False
 
@@ -204,6 +213,7 @@ sys.stderr.write("The names of %d individuals were read from the tree %s.\n" % (
 OutGroupDict = { }
 LocusListRemove = [ ]
 NumSeqsDict = defaultdict(list)
+SeqsperLocus = { }
 for Locus in LocusList:
 	FileExists = True
 	InFileName1 = AlFolder1+AlFilePre1+Locus+AlFilePost1
@@ -235,6 +245,7 @@ for Locus in LocusList:
 			print("%d of these sequences belong to the individuals of interest.\n" % (len(SeqDictOut)))
 			print("The outgroup sequence for Locus %s is %s, with a rank of %d.\n" % (Locus, LocusOG, OGNum))
 		NumSeqsDict[len(SeqDictOut)].append(Locus)
+		SeqsperLocus[Locus] = len(SeqDictOut)
 		OutGroupDict[Locus] = LocusOG
 		OutFileName = OutFolder+OutFilePre+Locus+OutFilePost+".fa"
 		SeqFileWriting(OutFileName, SeqDictOut, 'fasta')
@@ -248,29 +259,67 @@ for NumSeqs in sorted(NumSeqsDict.keys(), reverse=True):
 		LocusList += NumSeqsDict[NumSeqs]
 
 #writing the script to analyze the data further
-Script1FileName = OutFolder+OutFilePre+"analysis_script1.sh"
-Script2FileName = OutFolder+OutFilePre+"analysis_script2.sh"
-Script3FileName = OutFolder+OutFilePre+"analysis_script3.sh"
-OutList1 = ["#! /bin/bash\n\n"]
-OutList2 = []
-OutList3 = []
-for Locus in LocusList:
-	#Align, change to phylip
-	Line = "rm "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.fa "+OutFolder+"RAxML_*."+OutFilePre+Locus+OutFilePost+"\n"
+if Mode == 'Parallel':
+	Script1FileName = OutFolder+OutFilePre+"analysis_script1.sh"
+	Script2FileName = OutFolder+OutFilePre+"analysis_script2.sh"
+	Script3FileName = OutFolder+OutFilePre+"analysis_script3.sh"
+	OutList1 = ["#! /bin/bash\n\n"]
+	OutList2 = []
+	OutList3 = []
+	for Locus in LocusList:
+		#Align, change to phylip
+		Line = "rm "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.fa "+OutFolder+"RAxML_*."+OutFilePre+Locus+OutFilePost+"\n"
+		OutList1.append(Line)
+		Line = "mafft --localpair --maxiterate 1000 --quiet "+OutFolder+OutFilePre+Locus+OutFilePost+".fa > "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.fa && "
+		Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.fa\n"
+		OutList2.append(Line)
+		#raxml, Notung
+		Line = "raxmlHPC -f a -s "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.phy -n "+OutFilePre+Locus+OutFilePost+" -m GTRCAT -p 1234 -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+" && "
+		#version for laptop
+		#Line += "java -jar ~/bin/Notung-2.8.1.6-beta.jar -g "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+OutFilePost+" -s "+SpeciesTreeFN+" --speciestag prefix --rearrange --threshold 90 --nolosses --silent  --usegenedir\n"
+		#version for oscar
+		Line += "java -jar "+ScriptPath+"Notung-2.8.1.6-beta.jar -g "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+OutFilePost+" -s "+SpeciesTreeFN+" --speciestag prefix --rearrange --threshold 90 --nolosses --silent  --usegenedir\n"
+		OutList3.append(Line)
+	Line = "cat "+Script2FileName+" | parallel --joblog "+OutFolder+OutFilePre+"parallel_log2.log\n"
+	Line += "cat "+Script3FileName+" | parallel --joblog "+OutFolder+OutFilePre+"parallel_log3.log\n"
 	OutList1.append(Line)
-	Line = "mafft --localpair --maxiterate 1000 --quiet "+OutFolder+OutFilePre+Locus+OutFilePost+".fa > "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.fa && "
-	Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.fa\n"
-	OutList2.append(Line)
-	#raxml, Notung
-	Line = "raxmlHPC -f a -s "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.phy -n "+OutFilePre+Locus+OutFilePost+" -m GTRCAT -p 1234 -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+" && "
-	#version for laptop
-	#Line += "java -jar ~/bin/Notung-2.8.1.6-beta.jar -g "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+OutFilePost+" -s "+SpeciesTreeFN+" --speciestag prefix --rearrange --threshold 90 --homologtabletabs --nolosses --silent  --usegenedir\n"
-	#version for oscar
-	Line += "java -jar "+ScriptPath+"Notung-2.8.1.6-beta.jar -g "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+OutFilePost+" -s "+SpeciesTreeFN+" --speciestag prefix --rearrange --threshold 90 --homologtabletabs --nolosses --silent  --usegenedir\n"
-	OutList3.append(Line)
-Line = "cat "+Script2FileName+" | parallel --joblog "+OutFolder+OutFilePre+"parallel_log2.log\n"
-Line += "cat "+Script3FileName+" | parallel --joblog "+OutFolder+OutFilePre+"parallel_log3.log\n"
-OutList1.append(Line)
-OutFileWriting(Script1FileName, OutList1)
-OutFileWriting(Script2FileName, OutList2)
-OutFileWriting(Script3FileName, OutList3)
+	OutFileWriting(Script1FileName, OutList1)
+	OutFileWriting(Script2FileName, OutList2)
+	OutFileWriting(Script3FileName, OutList3)
+elif Mode == 'Array':
+	SBatchList = [ ]
+	for Locus in LocusList:
+		OutList = ["#! /bin/bash\n#SBATCH -J "+OutFilePre+Locus+"\n#SBATCH -t 12:00:00\n"]
+		if SeqsperLocus[Locus] < 100:
+			Line = "#SBATCH -n 1\n"
+		elif SeqsperLocus[Locus] < 200:
+			Line = "#SBATCH -n 2\n"
+		else:
+			Line = "#SBATCH -n 4\n"
+		Line += "module load mafft\nmodule load raxml\n"
+		OutList.append(Line)
+		#Align, change to phylip
+		Line = "rm "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.fa "+OutFolder+"RAxML_*."+OutFilePre+Locus+OutFilePost+"\n"
+		OutList.append(Line)
+		Line = "mafft --localpair --maxiterate 1000 --quiet "+OutFolder+OutFilePre+Locus+OutFilePost+".fa > "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.fa\n"
+		Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.fa\n"
+		OutList.append(Line)
+		#raxml, Notung
+		Line = "raxmlHPC -f a -s "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.phy -n "+OutFilePre+Locus+OutFilePost+" -m GTRCAT -p 1234 -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		#version for laptop
+		#Line += "java -jar ~/bin/Notung-2.8.1.6-beta.jar -g "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+OutFilePost+" -s "+SpeciesTreeFN+" --speciestag prefix --rearrange --threshold 90 --homologtabletabs --nolosses --silent  --usegenedir\n"
+		#version for oscar
+		Line += "java -jar "+ScriptPath+"Notung-2.8.1.6-beta.jar -g "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+OutFilePost+" -s "+SpeciesTreeFN+" --speciestag prefix --rearrange --threshold 90 --homologtabletabs --nolosses --silent  --usegenedir\n"
+		OutList.append(Line)
+		OutFileName = OutFolder+OutFilePre+Locus+"script.sh"
+		OutFileWriting(OutFileName, OutList)
+		OutLine = "sbatch "+OutFileName
+		SBatchOut = subprocess.Popen(OutLine, shell=True, stdout=subprocess.PIPE).communicate()[0]
+		SBatchList.append(SBatchOut.strip('\r').strip('\n').split(" ")[-1])
+	print("%d separate scripts for alignment and tree building, one for each locus, were submitted.\n" % (len(SBatchList)))
+	sys.stderr.write("%d separate scripts for alignment and tree building, one for each locus, were submitted.\n" % (len(SBatchList)))
+	OutLine = "sbatch -d afterok:"+":".join(SBatchList)+" "+NextScriptFN
+	SBatchOut = subprocess.Popen(OutLine, shell=True, stdout=subprocess.PIPE).communicate()[0]
+	JobIDPrev = SBatchOut.strip('\r').strip('\n').split(" ")[-1]
+	print("The subsequent script, %s, will be run with the job id %s, when the previous scripts have finished.\n" % (NextScriptFN, JobIDPrev))
+	sys.stderr.write("The subsequent script, %s, will be run with the job id %s, when the previous scripts have finished.\n" % (NextScriptFN, JobIDPrev))

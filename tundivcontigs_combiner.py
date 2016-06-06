@@ -85,7 +85,7 @@ if OutFolder[-1] != "/":
 OutFilePre = sys.argv[10]
 if OutFilePre == "none":
 	OutFilePre = ""
-NCores = sys.argv[11]
+NCores = int(sys.argv[11])
 
 #DictFromFile makes a dictionary from a tab-delimited file, where the first
 #column is the key and the second is the value
@@ -215,7 +215,7 @@ for Locus in RedoDict:
 		Line = "mafft --localpair --addfragments "+OutFolder+OutFilePre+Paralog+".fa --quiet --thread -1 "+AlFolder+AlFilePre+Locus+AlFilePost+".fa > "+OutFolder+OutFilePre+Paralog+"_allseqs_al.fa\n"
 		OutList2.append(Line)
 Line = "chmod u+x "+OutFileName2+"\n"
-Line += "cat "+OutFileName2+" | parallel --jobs "+NCores+" --progress\n"
+Line += "cat "+OutFileName2+" | parallel --jobs "+str(NCores/2)+" --progress --joblog "+OutFolder+OutFilePre+"parallel_log.log\n"
 OutList1.append(Line)
 OutFileWriting(OutFileName1, OutList1)
 OutFileWriting(OutFileName2, OutList2)

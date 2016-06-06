@@ -37,6 +37,7 @@ from Bio import SeqIO #to read files of non-aligned sequences
 from Bio.Alphabet import IUPAC #to recognize sequences
 from Bio.SeqRecord import SeqRecord #to make strings into sequence objects
 import numpy #to calculate means
+import subprocess #We want to be able to talk to the command line.
 
 Usage = '''
 tparalog_combiner.py labels sequences according to paralog and combines them.
@@ -59,15 +60,19 @@ be "/", if there is no suffix, but there is still a folder]
 [prefix for output files, or "none" if none]
 [the name of the pardict file, showing which sequences belong to which paralogs]
 [number of cores for script]
+[mode: Parallel or Array]
+[file name for the next script, if mode is Array]
 '''
 
-#tparalog_combiner.py GFileName OGFileName SeqFilePath SeqFolderPre SeqFolderPost SeqFilePre AlFolder AlFilePre AlFilePost ScriptPath OutFolder OutFilePre PFileName NCores
+#tparalog_combiner.py GFileName OGFileName SeqFilePath SeqFolderPre SeqFolderPost SeqFilePre AlFolder AlFilePre AlFilePost ScriptPath OutFolder OutFilePre PFileName NCores Mode[Parallel, Array] NextScript
 #tparalog_combiner.py ~/transcriptomes/general/Group_List_sand1.txt ~/transcriptomes/general/outgroup_list_new.txt ~/transcriptomes/sandbox/ none none s1_ ~/transcriptomes/general/phot_optimal_trees/ new_ _al none ~/transcriptomes/sandbox/amk/combined/ amktr1_ ~/transcriptomes/general/pardict6.txt
 
 print("%s\n" % (" ".join(sys.argv)))
 
-if len(sys.argv) < 15:
-	sys.exit("ERROR!  This script requires 14 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
+ModeList = ['Parallel', 'Array']
+
+if len(sys.argv) < 16:
+	sys.exit("ERROR!  This script requires 15 or 16 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
 GFileName = sys.argv[1]
 OGFileName = sys.argv[2]
 SeqFilePath = sys.argv[3]
@@ -106,7 +111,13 @@ if OutFilePre == "none":
 	OutFilePre = ""
 PFileName = sys.argv[13]
 NCores = sys.argv[14]
+Mode = sys.argv[15]
+if Mode not in ModeList:
+	sys.exit("ERROR!  You wanted to use the mode %s, but it can only be one of the following: %s.\n%s" % (Mode, ", ".join(ModeList), Usage))
+if Mode == "Array":
+	NextScript = sys.argv[16]
 
+#################################################################################
 
 #NoneDictFromFile makes a dictionary from a tab-delimited file, where the first
 #column is the key and the second is the value, but if the value is "none",
@@ -186,6 +197,17 @@ def LocusSeqCombiner(LList,GDict,FilePath,FolderPre,FolderPost,FilePre,FilePost,
 	return TempDict, TempNameDict
 	#These are ParDict and LPNameDict
 
+#LocusSeqListMaker reads a file of sequences and makes a list of the sequence names in that file
+#original
+def LocusSeqListMaker(FileName,SeqFormat):
+	ListTemp = [ ]
+	InFile = open(FileName, 'rU')
+	for record in SeqIO.parse(InFile, SeqFormat):
+		ListTemp.append(record.id)
+	InFile.close()
+	return ListTemp
+	#This is LocusSeqList
+
 #OutFileWriting writes an output file from a list of lines to write.
 #The lines must already have "\n" at the end.
 #from tbaits_intron_removal.py
@@ -197,38 +219,7 @@ def OutFileWriting(FileName, MyList):
 	print("Output file %s written.\n" % (FileName))
 	sys.stderr.write("Output file %s written.\n" % (FileName))
 
-#This is based on MRScriptWriter from tbaits_introns_removal.py and AMScriptWriter from tclade_finder.py
-#It writes a script that adds the sequences to the file of pre-existing
-#sequences for that locus and then aligns them.
-#This is rewritten to parallelize things.
-def AMRScriptWriter(OLList, OGDict, Folder, Prefix, AFolder, APre, APost, Path, PDFileName):
-	#the overall analysis script
-	OutList1 = ["#! /bin/bash\n"]
-	OutFileName1 = Folder+Prefix+"Analysis_Script.sh"
-	#the script that can be parallelized
-	OutList2 = ["#! /bin/bash\n"]
-	OutFileName2 = Folder+Prefix+"Al_Tr_Script.sh"
-	#first, add the old pardict to the new pardict; we want to do it this way, instead of just automatically writing the pardict
-	#so that mutliple rounds of tparalog_combiner.py can be combined by another script more easily.
-	Line = "cat "+Folder+Prefix+"pardict.txt "+PDFileName+" > "+Folder+Prefix+"pardict_new.txt\n"
-	#then change the mode of the second file, so we can execute it.
-	Line += "chmod u+x "+OutFileName2+"\n"
-	OutList1.append(Line)
-	#then deal with the alignments
-	for Locus in OLList:
-		Line = "rm "+Folder+Prefix+Locus+"_allseqs_al.fa\n"
-		Line += "rm "+Folder+"RAxML*"+Prefix+Locus+"\n"
-		OutList1.append(Line)
-		Line = "mafft --localpair --add "+Folder+Prefix+Locus+"_combined_best.fa --quiet --thread -1 "+AFolder+APre+Locus+APost+".fa > "+Folder+Prefix+Locus+"_allseqs_al.fa && "
-		Line += Path+"fasta_to_phylip.py "+Folder+Prefix+Locus+"_allseqs_al.fa && "
-		Line += "raxmlHPC -s "+Folder+Prefix+Locus+"_allseqs_al.phy -n "+Prefix+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OGDict[Locus]+" -w "+Folder+"\n"
-		OutList2.append(Line)
-	Line = "cat "+OutFileName2+" | parallel --jobs "+NCores+" --joblog "+Folder+Prefix+"parallel_log.log\n"
-	OutList1.append(Line)
-	OutFileWriting(OutFileName1, OutList1)
-	OutFileWriting(OutFileName2, OutList2)
-	print("The shell script for analyzing the sequences further was written to %s.\n" % (OutFileName1))
-	sys.stderr.write("The shell script for analyzing the sequences further was written to %s.\n" % (OutFileName1))
+#################################################################################
 
 
 #make the dictionary of the taxonomic groups and their shortened names
@@ -411,6 +402,7 @@ OutFileWriting(OutFileName, OutList)
 #finding the loci and writing them to the files
 LPNameDict = defaultdict(dict)
 OutLocusDict = defaultdict(list) 
+SeqsperLocus = { }
 FileMovingScriptName = OutFolder+OutFilePre+"file_moving_script.sh"
 FileMovingScript = ['#! /bin/bash\n\n']
 for Locus in LPDict:
@@ -418,6 +410,7 @@ for Locus in LPDict:
 	#LocusSeqCombiner(LList,GDict,FilePath,FolderPre,FolderPost,FilePre,FilePost,SeqFormat)
 	#FileName = FilePath+Group+"/"+FolderPre+GroupDict[Group]+FolderPost+FilePre+Locus+FilePost
 	#FileName = SeqFilePath+Group+"/"+SeqFolderPre+GroupDict[Group]+SeqFolderPost+SeqFilePre+Locus+".fa"
+	LocusSeqList = LocusSeqListMaker(AlFolder+AlFilePre+Locus+AlFilePost+".fa", "fasta")
 	if len(ParDict.keys()) != 0:
 		NumSeqs = 0
 		NumGoodSeqs = 0
@@ -429,12 +422,39 @@ for Locus in LPDict:
 		OutFile3 = open(OutFileName3, 'w')
 		for Paralog in ParDict:
 			SeqLenList = [ ]
+			NewParDict = { }
 			for ParName in ParDict[Paralog]:
 				SeqLenList.append(len(ParDict[Paralog][ParName]))
 			SeqMeanLen = numpy.mean(SeqLenList)
 			#and making a third (bzw. 2nd) outfile that only contains the sequences from a single paralog
 			OutFileName2 = OutFolder+OutFilePre+Locus+"_"+Paralog+".fa"
 			OutFile2 = open(OutFileName2, 'w')
+			for ParName in ParDict[Paralog]:
+				if ParName in LocusSeqList:
+					print("Sequence %s is already present in the alignment!\n" % (ParName))
+					SplitParName = ParName.split(".")
+					#Pereskia_saccharosa_67.10951.1seqs.0ambig.len818
+					LocusPart = SplitParName[1]+"_new"
+					SplitParName[1] = LocusPart
+					NewParName = ".".join(SplitParName)
+					if NewParName in LocusSeqList:
+						LocusPart += "b"
+						SplitParName[1] = LocusPart
+						NewParName = ".".join(SplitParName)
+						if NewParName in LocusSeqList:
+							sys.exit("ERROR!!  The name %s has been repeated too many times; there is likely a problem!!\n" % (ParName))
+					print("The new name for this sequence is %s.\n" % (NewParName))
+					NewParDict[NewParName] = ParName
+			#if any repeated names were found,
+			if NewParDict != { }:
+				for NewParName in NewParDict:
+					ParName = NewParDict[NewParName]
+					#add the new name to ParDict
+					ParDict[Paralog][NewParName] = ParDict[Paralog][ParName]
+					#and delete the old name
+					print("Sequence %s will be removed from the ParDict.\n" % (ParName))
+					del ParDict[Paralog][ParName]
+			#then we can go back to writing sequences
 			for ParName in ParDict[Paralog]:
 				#print ("%s: %d." % (ParName, len(ParDict[Paralog][ParName])))
 				Record1 = SeqRecord(seq=Seq(ParDict[Paralog][ParName], IUPAC), id = ParName, description = "")
@@ -457,24 +477,17 @@ for Locus in LPDict:
 		print("%d of these sequences were long enough to be written to the new backbone file %s.\n" % (NumGoodSeqs, OutFileName3))
 		if NumGoodSeqs != 0:
 			OutLocusDict[NumGoodSeqs].append(Locus)
+			SeqsperLocus[Locus] = NumGoodSeqs
 		else:
 			Line = "cp "+AlFolder+AlFilePre+Locus+AlFilePost+".fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
-			Line += "cp "+AlFolder+"RAxML_bipartitions."+AlFilePre+Locus+" "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+"\n"
+			Line += "cp "+AlFolder+"RAxML_bestTree."+AlFilePre+Locus+" "+OutFolder+"RAxML_bestTree."+OutFilePre+Locus+"\n"
 			FileMovingScript.append(Line)
 		#sys.stderr.write("%d of these sequences were long enough to be written to the new backbone file %s.\n" % (NumGoodSeqs, OutFileName3))
 		print("These sequences were also written to %d separate files for each paralog, with names such as %s.\n" % (len(ParDict), OutFileName2))
 	else:
 		Line = "cp "+AlFolder+AlFilePre+Locus+AlFilePost+".fa "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
-		Line += "cp "+AlFolder+"RAxML_bipartitions."+AlFilePre+Locus+" "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+"\n"
+		Line += "cp "+AlFolder+"RAxML_bestTree."+AlFilePre+Locus+" "+OutFolder+"RAxML_bestTree."+OutFilePre+Locus+"\n"
 		FileMovingScript.append(Line)
-
-OutLocusList = [ ]
-for NumGoodSeqs in sorted(OutLocusDict.keys(), reverse=True):
-	if NumGoodSeqs != 0:
-		OutLocusList += OutLocusDict[NumGoodSeqs]
-		
-#writing the script to analyze the files for the good loci
-AMRScriptWriter(OutLocusList, OutGroupDict, OutFolder, OutFilePre, AlFolder, AlFilePre, AlFilePost, ScriptPath, PFileName)
 #writing the script to analyze the files for the bad loci
 OutFileWriting(FileMovingScriptName, FileMovingScript)
 
@@ -489,3 +502,89 @@ for Locus in sorted(LPNameDict.keys()):
 		OutList.append(Line)
 OutFileName = OutFolder+OutFilePre+"pardict.txt"
 OutFileWriting(OutFileName, OutList)
+
+
+OutLocusList = [ ]
+for NumGoodSeqs in sorted(OutLocusDict.keys(), reverse=True):
+	if NumGoodSeqs != 0:
+		OutLocusList += OutLocusDict[NumGoodSeqs]
+
+if Mode == "Parallel":
+	#the overall analysis script
+	OutList1 = ["#! /bin/bash\n"]
+	OutFileName1 = OutFolder+OutFilePre+"Analysis_Script.sh"
+	#the script that can be parallelized
+	OutList2 = ["#! /bin/bash\n"]
+	OutFileName2 = OutFolder+OutFilePre+"Al_Tr_Script.sh"
+	#first, add the old pardict to the new pardict; we want to do it this way, instead of just automatically writing the pardict
+	#so that mutliple rounds of tparalog_combiner.py can be combined by another script more easily.
+	Line = "cat "+OutFolder+OutFilePre+"pardict.txt "+PFileName+" > "+OutFolder+OutFilePre+"pardict_new.txt\n"
+	#then change the mode of the second file, so we can execute it.
+	Line += "chmod u+x "+OutFileName2+"\n"
+	OutList1.append(Line)
+	#then deal with the alignments
+	for Locus in OutLocusList:
+		Line = "rm "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+		Line += "rm "+OutFolder+"RAxML*"+OutFilePre+Locus+"\n"
+		OutList1.append(Line)
+		Line = "mafft --localpair --add "+OutFolder+OutFilePre+Locus+"_combined_best.fa --quiet --thread -1 "+AlFolder+AlFilePre+Locus+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa && "
+		Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa && "
+		#Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+"_allseqs_al.phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+"_allseqs_al.phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f d -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		OutList2.append(Line)
+	Line = "cat "+OutFileName2+" | parallel --jobs "+NCores+" --joblog "+OutFolder+OutFilePre+"parallel_log.log\n"
+	OutList1.append(Line)
+	OutFileWriting(OutFileName1, OutList1)
+	OutFileWriting(OutFileName2, OutList2)
+	print("The shell script for analyzing the sequences further was written to %s.\n" % (OutFileName1))
+	sys.stderr.write("The shell script for analyzing the sequences further was written to %s.\n" % (OutFileName1))
+elif Mode == "Array":
+	SBatchList = [ ]
+	#each gene will get its own file (although this is not actually an array)
+	for Locus in OutLocusList:
+		OutScript = ["#!/bin/bash\n"]
+		OutScript.append("#SBATCH -J "+OutFilePre+Locus+"\n")
+		OutScript.append("#SBATCH -t 6:00:00\n")
+		OutScript.append("#SBATCH -n 1\n")
+		#giving more cores to large alignments
+		if (SeqsperLocus[Locus] > 50) or (Locus in ["ppc1", "ppc2"]):
+			OutScript.append("#SBATCH --mem=16G\n")
+		Line = "module load mafft\nmodule load raxml\n"
+		OutScript.append(Line)
+		Line = "rm "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+		Line += "rm "+OutFolder+"RAxML*"+OutFilePre+Locus+"\n"
+		OutScript.append(Line)
+		Line = "mafft --localpair --add "+OutFolder+OutFilePre+Locus+"_combined_best.fa --quiet --thread -1 "+AlFolder+AlFilePre+Locus+AlFilePost+".fa > "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+		Line += ScriptPath+"fasta_to_phylip.py "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
+		#I don't think we use the bootstrap values, so I can save time by just making a tree.
+		Line += "raxmlHPC -f d -s "+OutFolder+OutFilePre+Locus+"_allseqs_al.phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		#Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+"_allseqs_al.phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+"\n"
+		OutScript.append(Line)
+		OutFileName = OutFolder+OutFilePre+Locus+"_script.sh"
+		OutFileWriting(OutFileName, OutScript)
+		OutLine = "sbatch "+OutFileName
+		SBatchOut = subprocess.Popen(OutLine, shell=True, stdout=subprocess.PIPE).communicate()[0]
+		SBatchList.append(SBatchOut.strip('\r').strip('\n').split(" ")[-1])
+	print("%d separate jobs were submitted to reconstruct the gene trees.\n" % (len(SBatchList)))
+	sys.stderr.write("%d separate jobs were submitted to reconstruct the gene trees.\n" % (len(SBatchList)))
+	OutScript = ['#! /bin/bash\n#SBATCH -J '+OutFilePre+'parcombiner\n#SBATCH -t 2:00:00\n\n']
+	#first, add the old pardict to the new pardict; we want to do it this way, instead of just automatically writing the pardict
+	#so that mutliple rounds of tparalog_combiner.py can be combined by another script more easily.
+	Line = "cat "+OutFolder+OutFilePre+"pardict.txt "+PFileName+" > "+OutFolder+OutFilePre+"pardict_new.txt\n"
+	OutScript.append(Line)
+	#running the file moving script:
+	Line = "chmod u+x "+FileMovingScriptName+"\n"
+	Line += FileMovingScriptName+"\n"
+	OutScript.append(Line)
+	#running the next master script:
+	Line = "chmod u+x "+NextScript+'\n'
+	Line += NextScript+'\n'
+	OutScript.append(Line)
+	OutFileName = OutFolder+OutFilePre+"Analysis_Script.sh"
+	OutFileWriting(OutFileName, OutScript)
+	#this will take place only after the job arrays for all of the individuals have been run.
+	OutLine = "sbatch -d afterok:"+":".join(SBatchList)+" "+OutFileName
+	SBatchOut = subprocess.Popen(OutLine, shell=True, stdout=subprocess.PIPE).communicate()[0]
+	JobIDPrev = SBatchOut.strip('\r').strip('\n').split(" ")[-1]
+	print("The subsequent script will be run with the job id %s, when the previous scripts have finished.\n" % (JobIDPrev))
+	sys.stderr.write("The subsequent script will be run with the job id %s, when the previous scripts have finished.\n" % (JobIDPrev))

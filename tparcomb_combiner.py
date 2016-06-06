@@ -142,6 +142,8 @@ if ScriptPath == "none/":
 ParDictFileName = sys.argv[13]
 NCores = sys.argv[14]
 
+###################################################################################
+
 #NoneDictFromFile makes a dictionary from a tab-delimited file, where the first
 #column is the key and the second is the value, but if the value is "none",
 #then the value is ""
@@ -546,13 +548,15 @@ for FileGroup in FileGroupDict:
 						ApSDict[Locus][Paralog][Group][FileGroup]['Bad'] = Bad
 	InFile.close()
 #printing the file
+
+print ApSDict
 OutFileName = OutFolder + OutFilePre + "Ambigs_per_Seq.txt"
 OutList = ["Locus\tParalog\t"+"\t".join([Group+"_#_Ambigs_in_Good_Seqs\t"+Group+"_#_Ambigs_in_Bad_Seqs" for Group in GroupList])+"\n"]
 for Locus in sorted(ApSDict.keys()):
 	for Paralog in sorted(ApSDict[Locus].keys()):
 		Line = Locus+"\t"+Paralog+"\t"
 		for Group in GroupList:
-			#print("%s: %s: %s\n" % (Locus, Paralog, Group))
+			print("%s: %s: %s\n" % (Locus, Paralog, Group))
 			#if we just have a single FileGroup with good sequences, use it without further complications
 			if len(ParsUsingDict[Locus][Paralog][Group]['both']) == 1:
 				FGUsing = ParsUsingDict[Locus][Paralog][Group]['both'][0]
@@ -814,6 +818,7 @@ for Locus in LPDict.keys():
 				SeqIO.write(record, OutFile3, "fasta")
 				#and to the file with all sequences for that locus
 				SeqIO.write(record, OutFile1, "fasta")
+				NumSeqs += 1
 			InFile.close()
 		except IOError:
 			"no sequence files for this record"
