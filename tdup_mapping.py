@@ -172,14 +172,17 @@ for Node in SppTree.preorder_node_iter():
 	if Node.label == None:
 		Node.label = "0"
 	else:
-		print Node.label
+		#This is where you decide if you want whole numbers for the node labels and, if not, how many decimal places you want the labels to have.
+		#However, figtree has a problem reading node labels with decimal places.
+		#print Node.label
 		Node.label = str(int(Node.label))
 		#if ((Node.label % 1) == 0):
 		#	Node.label = str(int(Node.label))
 		#else:
-		#	Node.label = ("%.1f" % (Node.label))
-		print Node.label
+		#	Node.label = ("%.2f" % (Node.label))
+		#print Node.label
 		
 if ShowTrees == True: print(SppTree.as_ascii_plot(show_internal_node_labels=True))
 
 SppTree.write(path=OutFileName, schema="newick", suppress_leaf_node_labels = False, suppress_internal_node_labels = False, unquoted_underscores=True, node_label_element_separator = ",")
+

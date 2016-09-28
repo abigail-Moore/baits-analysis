@@ -548,8 +548,7 @@ for FileGroup in FileGroupDict:
 						ApSDict[Locus][Paralog][Group][FileGroup]['Bad'] = Bad
 	InFile.close()
 #printing the file
-
-print ApSDict
+'''
 OutFileName = OutFolder + OutFilePre + "Ambigs_per_Seq.txt"
 OutList = ["Locus\tParalog\t"+"\t".join([Group+"_#_Ambigs_in_Good_Seqs\t"+Group+"_#_Ambigs_in_Bad_Seqs" for Group in GroupList])+"\n"]
 for Locus in sorted(ApSDict.keys()):
@@ -557,6 +556,7 @@ for Locus in sorted(ApSDict.keys()):
 		Line = Locus+"\t"+Paralog+"\t"
 		for Group in GroupList:
 			print("%s: %s: %s\n" % (Locus, Paralog, Group))
+			print ParsUsingDict[Locus][Paralog][Group]
 			#if we just have a single FileGroup with good sequences, use it without further complications
 			if len(ParsUsingDict[Locus][Paralog][Group]['both']) == 1:
 				FGUsing = ParsUsingDict[Locus][Paralog][Group]['both'][0]
@@ -567,6 +567,8 @@ for Locus in sorted(ApSDict.keys()):
 				GoodList = [ ]
 				BadList = [ ]
 				for FileGroup in ParsUsingDict[Locus][Paralog][Group]['both']:
+					print FileGroup
+					print ApSDict[Locus][Paralog][Group][FileGroup]
 					if ApSDict[Locus][Paralog][Group][FileGroup]['Good'] != "":
 						GoodList.append(ApSDict[Locus][Paralog][Group][FileGroup]['Good'])
 					else:
@@ -582,6 +584,7 @@ for Locus in sorted(ApSDict.keys()):
 		Line = Line[:-1]+"\n"
 		OutList.append(Line)
 OutFileWriting(OutFileName, OutList)
+'''
 
 #################parsing the Contig_Fates.txt files
 #setting up the dictionary I will fill out
@@ -717,12 +720,14 @@ for FileGroup in FileGroupDict:
 						SpLDict[Locus][Paralog][Group][FileGroup]['Bad'] = Bad
 	InFile.close()
 #writing the output
+'''
 OutFileName = OutFolder + OutFilePre + "Seqs_per_Locus.txt"
 OutList = ["Locus\tParalog\t"+"\t".join([Group+"_Total_Good_Seqs\t"+Group+"_Total_Bad_Seqs" for Group in GroupList])+"\n"]
 for Locus in sorted(SpLDict.keys()):
 	for Paralog in sorted(SpLDict[Locus].keys()):
 		Line = Locus+"\t"+Paralog+"\t"
 		for Group in GroupList:
+			print(Locus+" "+Paralog+" "+Group)
 			#if we just have a single FileGroup with good sequences, use it without further complications
 			if len(ParsUsingDict[Locus][Paralog][Group]['both']) == 1:
 				FGUsing = ParsUsingDict[Locus][Paralog][Group]['both'][0]
@@ -757,6 +762,7 @@ for Locus in sorted(SpLDict.keys()):
 		Line = Line[:-1]+"\n"
 		OutList.append(Line)
 OutFileWriting(OutFileName, OutList)
+'''
 
 #combining the sequences, first the combined sequences for each locus
 NumBestSeqFiles = 0

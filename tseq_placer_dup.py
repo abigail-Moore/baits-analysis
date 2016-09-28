@@ -450,8 +450,9 @@ def ParalogSeqWriter(CDict, CPDict, Folder, Prefix, Suffix, SeqFormat):
 				SeqIO.write(Record1, OutFile, SeqFormat)
 			OutFile.close()
 			NumFiles += 1
-		print("%d sequence files were written for the locus %s, with names such as %s.\n" % (NumFiles, Locus, OutFileName))
-		#sys.stderr.write("%d sequence files were written for the locus %s, with names such as %s.\n" % (NumFiles, Locus, OutFileName))
+		if NumFiles != 0:
+			print("%d sequence files were written for the locus %s, with names such as %s.\n" % (NumFiles, Locus, OutFileName))
+			#sys.stderr.write("%d sequence files were written for the locus %s, with names such as %s.\n" % (NumFiles, Locus, OutFileName))
 	return TempDict
 	#This is FileDict
 	

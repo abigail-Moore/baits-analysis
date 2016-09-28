@@ -5,7 +5,7 @@
 #It reads the locus_list_out.txt file from tnotung_homolog_parsing.py
 
 #tal_combiner.py ~/transcriptomes/Anacampserotaceae/Anac_seqs_final/LocusList.txt ~/transcriptomes/Anacampserotaceae/Anac_seqs_final/ Anac_ _OGa.fa fasta fasta Pereskia ~/transcriptomes/Anacampserotaceae/Anac_seqs_final/seqs_pruned/ pAnac_ separate 0 0 all
-#tal_combiner.py LocusListFileName ScriptFolder SeqFolder SeqFilePre SeqFilePost SeqFormatIn SeqFormatOut OGName OutFolder OutFilePre OutMode[combined, separate] MaxIndsMissing MaxSeqsMissing IndsUsingFileName[all] OGTreeFN[if OGName == tree]
+#tal_combiner.py LocusListFileName ScriptFolder SeqFolder SeqFilePre SeqFilePost SeqFormatIn SeqFormatOut OGName OutFolder OutFilePre OutMode[combined, separate, separatemb, combinednobs] MaxIndsMissing MaxSeqsMissing IndsUsingFileName[all] Method[Empty, List, integer] Mode[Array, Parallel] OGTreeFN[if OGName == tree] LongSeqListFN[if Method == List]
 
 Usage = '''
 tal_combiner renames the sequences in the alignments so that they are named
@@ -34,8 +34,13 @@ in which case we need to have the missing taxa included as question marks]
 [the maximum number of missing loci an individual can have and still be used]
 [file name for a list of which individuals should be used, or all, if all 
 individuals should be used]
+[method for finding gaps: "Empty" if only gaps count, "List" if all positions 
+that only include the individuals in the list should be removed, or an integer
+if all positions with that many or fewer individuals should be removed]
 [mode, either Array or Parallel]
 [tree file for outgroup, if OGName is tree]
+[list of individuals whose sequences should be removed if they are the only ones
+present at a given site, if Method is List]
 '''
 
 import sys
@@ -55,8 +60,8 @@ ModeList = ['Array', 'Parallel']
 
 print("%s\n" % (" ".join(sys.argv)))
 
-if len(sys.argv) < 16:
-	sys.exit("ERROR!  This script requires 15 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
+if len(sys.argv) < 17:
+	sys.exit("ERROR!  This script requires at least 16 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
 LocusListFileName = sys.argv[1]
 ScriptFolder = sys.argv[2]
 if ScriptFolder[-1] != "/":
@@ -89,11 +94,17 @@ if (OutMode in OutModeList) == False:
 MaxIndsMissing = int(sys.argv[12])
 MaxSeqsMissing = int(sys.argv[13])
 IndsUsingFileName = sys.argv[14]
-Mode = sys.argv[15]
+Method = sys.argv[15]
+Mode = sys.argv[16]
 if Mode not in ModeList:
 	sys.exit("ERROR!!  You wanted the mode to be %s, but it must be one of the following: %s.\n%s" % (Mode, ", ".join(ModeList), Usage))
 if OGName == "tree":
-	OGTreeFN = sys.argv[16]
+	OGTreeFN = sys.argv[17]
+	if Method == "List":
+		LongSeqListFN = sys.argv[18]
+elif Method == "List":
+	LongSeqListFN = sys.argv[17]
+
 
 Verbose = False
 Verbose = True
@@ -130,7 +141,10 @@ def OutFileWriting(FileName, MyList):
 #GapFinder finds the gaps in an alignment.  It returns a dictionary in which the gaps are numbered consecutively
 #(starting with 0) of the following form: DictTemp[GapNum]['start'/'end']: position in the alignment where the gap starts
 #or ends, respectively
-def GapFinder(AlignTemp):
+#Meth is the method, "empty" for only empty positions removed, "list" for remove positions in which members of the list are the only
+#ones present, and a number for remove positions in which that many or fewer individuals are present
+#ListTemp is the list of individuals to remove, or a blank list.
+def GapFinder(Meth, AlignTemp, ListTemp):
 	#look through each position of the alignment
 	DictTemp = defaultdict(dict)#DictTemp[GapNum]['start'/'end'] = SeqPos
 	GapNum = 0
@@ -140,9 +154,22 @@ def GapFinder(AlignTemp):
 	for SeqPos in range(0, AlignTemp.get_alignment_length()):
 		#determine whether or not there are nucleotides at that position
 		GapOnly = True
-		for record in AlignTemp:
-			if (record[SeqPos] != '-') and (record[SeqPos] != '?'):
-				GapOnly = False
+		if Meth == "Empty":
+			for record in AlignTemp:
+				if (record[SeqPos] != '-') and (record[SeqPos] != '?'):
+					GapOnly = False
+		elif Meth == "List":
+			for record in AlignTemp:
+				if record.id not in ListTemp:
+					if (record[SeqPos] != '-') and (record[SeqPos] != '?'):
+						GapOnly = False
+		else:
+			NumInds = 0
+			for record in AlignTemp:
+				if (record[SeqPos] != '-') and (record[SeqPos] != '?'):
+					NumInds += 1
+			if NumInds > int(Meth):
+				GapOnly = False 
 		#four possible combinations of currently in a gap or not and current site is a gap or not
 		#if this is a start of a new sequence segment
 		if (GapOnly == False) and (InGap == True):
@@ -156,7 +183,7 @@ def GapFinder(AlignTemp):
 			GapStart = SeqPos
 			InGap = True
 		#We do not need to deal with the other two options:
-		#in the middle of a segment [(GapOnly == False) and (InGap == False)]
+		#inA the middle of a segment [(GapOnly == False) and (InGap == False)]
 		#or in the middle of a gap [(GapOnly == True) and (InGap == True)]
 	#check to see if there is a gap at the end of the alignment
 	if (InGap == True):
@@ -165,28 +192,27 @@ def GapFinder(AlignTemp):
 		GapLength += (SeqPos-GapStart+1)
 	if Verbose == True: print("%d gaps were found, with a total length of %d.\n" % (GapNum+1, GapLength))
 	return DictTemp
-	#This is GapDict in AlignmentGapRemoving
+	#This is GapDict
 
 #AlignmentGapRemoving takes an alignment and removes all of the characters that are gaps
-#in all sequences.  It calls GapFinder.
-def AlignmentGapRemoving(AlignGaps):
-	GapDict = GapFinder(AlignGaps)
-	AlEnd = AlignGaps.get_alignment_length()-1
+#in all sequences.  It uses the results of GapFinder.
+def AlignmentGapRemoving(AlignTemp, DictTemp):
+	AlEnd = AlignTemp.get_alignment_length()-1
 	if Verbose == True: print("Before removing any gaps, the alignment is %d bases long.\n" % (AlEnd+1))
-	for GapNum in sorted(GapDict.keys(), reverse=True):
-		#print("Before removing gap %d: gap length: %d, alignment length %d\n" % (GapNum, GapDict[GapNum]['end']-GapDict[GapNum]['start']+1, AlignGaps.get_alignment_length()))
+	for GapNum in sorted(DictTemp.keys(), reverse=True):
+		#print("Before removing gap %d: gap length: %d, alignment length %d\n" % (GapNum, DictTemp[GapNum]['end']-DictTemp[GapNum]['start']+1, AlignTemp.get_alignment_length()))
 		#if this gap encompasses the end of the alignment, cut that bit off of the end of the alignment
-		if GapDict[GapNum]['end'] == AlEnd:
-			AlignGaps = AlignGaps[:, :GapDict[GapNum]['start']]
+		if DictTemp[GapNum]['end'] == AlEnd:
+			AlignTemp = AlignTemp[:, :DictTemp[GapNum]['start']]
 		#if this gap encompasses the start of the alignment, cut off the start
-		elif GapDict[GapNum]['start'] == 0:
-			AlignGaps = AlignGaps[:, (GapDict[GapNum]['end']+1):]
+		elif DictTemp[GapNum]['start'] == 0:
+			AlignTemp = AlignTemp[:, (DictTemp[GapNum]['end']+1):]
 		#for all gaps in the middle of the alignment
 		else:
-			AlignGaps = AlignGaps[:, :GapDict[GapNum]['start']] + AlignGaps[:, (GapDict[GapNum]['end']+1):]
-		#print("After removing gap %d: alignment length %d\n" % (GapNum, AlignGaps.get_alignment_length()))
-	if Verbose == True: print("After removing %d gaps, the alignment is now %d bases long.\n" % (len(GapDict), AlignGaps.get_alignment_length()))
-	return AlignGaps
+			AlignTemp = AlignTemp[:, :DictTemp[GapNum]['start']] + AlignTemp[:, (DictTemp[GapNum]['end']+1):]
+		#print("After removing gap %d: alignment length %d\n" % (GapNum, AlignTemp.get_alignment_length()))
+	if Verbose == True: print("After removing %d gaps, the alignment is now %d bases long.\n" % (len(DictTemp), AlignTemp.get_alignment_length()))
+	return AlignTemp
 	#This is now PAlign
 
 #LocusAlSeqGetter reads a series of alignments and makes a dictionary of the sequences
@@ -275,6 +301,13 @@ if OGName == "tree":
 	for Line in InFile:
 		SppTree = dendropy.Tree.get_from_string(Line.strip('\n').strip('\r'), schema = 'newick', preserve_underscores=True)
 	InFile.close()
+
+#reading the list of individuals to exclude from gap calculations, if we want to use that method
+if Method == "List":
+	LongSeqList = CaptureColumn(LongSeqListFN, 0)
+else:
+	LongSeqList = [ ]
+	
 
 #figure out which individuals have sequences for which loci
 SeqIndDict = defaultdict(dict)
@@ -399,7 +432,8 @@ if (OutMode == "combined") or (OutMode == "combinednobs"):
 			AlignGaps.append(Record1)
 		except NameError:
 			AlignGaps = MultipleSeqAlignment([Record1])
-	AlignOut = AlignmentGapRemoving(AlignGaps)
+	GapPosDict = GapFinder(Method, AlignGaps, LongSeqList)
+	AlignOut = AlignmentGapRemoving(AlignGaps, GapPosDict)
 	AlignIO.write(AlignOut, OutFileName, "fasta")
 	print("Concatenated sequences for %d individuals were written to the file %s.\n" % (len(AlignOut), OutFileName))
 	sys.stderr.write("Concatenated sequences for %d individuals were written to the file %s.\n" % (len(AlignOut), OutFileName))
@@ -433,6 +467,7 @@ elif OutMode == 'separatemb':
 		OutList1 = [ "#! /bin/bash\n\ncd "+OutFolder+"\n"]
 		OutList2 = [ ]
 		for Locus in GoodSeqs:
+			#***Probably need a filter for these loci as well***
 			OutFileName = OutFolder+OutFilePre+Locus+"_mb.fa"
 			AlignGaps = 0
 			for Ind in GoodInds:
@@ -441,7 +476,8 @@ elif OutMode == 'separatemb':
 					AlignGaps.append(Record1)
 				except AttributeError:
 					AlignGaps = MultipleSeqAlignment([Record1])
-			AlignOut = AlignmentGapRemoving(AlignGaps)
+			GapPosDict = GapFinder(Method, AlignGaps, LongSeqList)
+			AlignOut = AlignmentGapRemoving(AlignGaps, GapPosDict)
 			AlignIO.write(AlignOut, OutFileName, "fasta")
 			Line = ScriptFolder+"fasta_to_nexus_mb.py "+OutFilePre+Locus+"_mb.fa && "
 			Line += "mb < "+OutFilePre+Locus+"_mb_mb.nex > "+OutFilePre+Locus+"_mb.log\n"
@@ -469,7 +505,8 @@ elif OutMode == 'separatemb':
 					AlignGaps.append(Record1)
 				except AttributeError:
 					AlignGaps = MultipleSeqAlignment([Record1])
-			AlignOut = AlignmentGapRemoving(AlignGaps)
+			GapPosDict = GapFinder(Method, AlignGaps, LongSeqList)
+			AlignOut = AlignmentGapRemoving(AlignGaps, GapPosDict)
 			AlignIO.write(AlignOut, OutFileName, "fasta")
 			Line = ScriptFolder+"fasta_to_nexus_mb.py "+OutFilePre+Locus+"_mb.fa\n"
 			Line += "mb < "+OutFilePre+Locus+"_mb_mb.nex > "+OutFilePre+Locus+"_mb.log\n"
@@ -515,7 +552,8 @@ elif OutMode == 'separate':
 					LocusIndList.append(Ind)
 				except KeyError:
 					"do not add that sequence, because it doesn't exist"
-			AlignOut = AlignmentGapRemoving(AlignGaps)
+			GapPosDict = GapFinder(Method, AlignGaps, LongSeqList)
+			AlignOut = AlignmentGapRemoving(AlignGaps, GapPosDict)
 			AlignIO.write(AlignOut, OutFileName, "fasta")
 			Line = "rm "+OutFolder+"RAxML_*."+OutFilePre+Locus+"\n"
 			OutList1.append(Line)
@@ -529,7 +567,8 @@ elif OutMode == 'separate':
 				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+LocusOG+" -w "+OutFolder+"\n"
 			else:
 				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OGName+" -w "+OutFolder+"\n"
-			OutList2.append(Line)
+			if len(LocusIndList) > 3:
+				OutList2.append(Line)
 		print("%d sequence files were written, with names such as %s.\n" % (len(GoodSeqs), OutFileName))
 		sys.stderr.write("%d sequence files were written, with names such as %s.\n" % (len(GoodSeqs), OutFileName))
 		OutFileName1 = OutFolder+OutFilePre+"analysis_script_raxml1.sh"
@@ -550,7 +589,6 @@ elif OutMode == 'separate':
 		OutScript = ["#! /bin/bash\n#SBATCH -J "+str(LocusGroup)+"_genetrees\n#SBATCH -t 6:00:00\n#SBATCH -n 1\nmodule load raxml\n"]
 		OutScriptName = OutFolder+OutFilePre+"Grp_"+str(LocusGroup)+"_script.sh"
 		for Locus in GoodSeqs:
-			NumLoci += 1
 			OutFileName = OutFolder+OutFilePre+Locus+".fa"
 			AlignGaps = 0
 			LocusIndList = [ ]
@@ -564,7 +602,8 @@ elif OutMode == 'separate':
 					LocusIndList.append(Ind)
 				except KeyError:
 					"do not add that sequence, because it doesn't exist"
-			AlignOut = AlignmentGapRemoving(AlignGaps)
+			GapPosDict = GapFinder(Method, AlignGaps, LongSeqList)
+			AlignOut = AlignmentGapRemoving(AlignGaps, GapPosDict)
 			AlignIO.write(AlignOut, OutFileName, "fasta")
 			Line = "rm "+OutFolder+"RAxML_*."+OutFilePre+Locus+"\n"
 			OutScript.append(Line)
@@ -578,7 +617,9 @@ elif OutMode == 'separate':
 				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+LocusOG+" -w "+OutFolder+"\n"
 			else:
 				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OGName+" -w "+OutFolder+"\n"
-			OutScript.append(Line)
+			if len(LocusIndList) > 3:
+				NumLoci += 1
+				OutScript.append(Line)
 			if NumLoci == 5:
 				OutFileWriting(OutScriptName, OutScript)
 				OutLine = "sbatch "+OutScriptName

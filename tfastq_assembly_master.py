@@ -146,7 +146,7 @@ elif BlastRounds == 2:
 		OutFileWriting(OutFileName, OutScript)
 		print("Since you are running in array mode, the file you will need to execute is %s.  It should then execute the remaining files.\n" % (OutFileName))
 		sys.stderr.write("Since you are running in array mode, the file you will need to execute is %s.  It should then execute the remaining files.\n" % (OutFileName))
-		OutScript = ['#! /bin/bash\n#SBATCH -J '+GroupPre+'_fastq_assembly2\n#SBATCH -t '+str(NumHrs*4)+':00:00\n#SBATCH -n '+NCores+'\n#SBATCH --mem='+str(NCores*8)+'G\n\n\nmodule load blast\nmodule load spades\n']
+		OutScript = ['#! /bin/bash\n#SBATCH -J '+GroupPre+'_fastq_assembly2\n#SBATCH -t '+str(NumHrs*4)+':00:00\n#SBATCH -n '+NCores+'\n#SBATCH --mem='+str(int(NCores)*8)+'G\n\n\nmodule load blast\nmodule load spades\n']
 	#running blast
 	elif Mode == "Parallel":
 		Line = "chmod u+x "+DataFolder+"b1_"+GroupPre+"/b1_blast_script1.sh\n"
