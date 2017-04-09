@@ -9,9 +9,8 @@ import subprocess
 import sys
 
 '''
-torig_spp_tree_master.py GroupDictFN InFolder SeqFolder ScriptPath LLFileName Mode
-/users/ajm3/data/ajm3/scripts/torig_spp_tree_master.py 14April2016 /users/ajm3/data/ajm3/general/Group_List_Ln3_4_5.txt /gpfs/scratch/ajm3/eedwards/ /users/ajm3/data/ajm3/ /users/ajm3/data/ajm3/scripts/ /users/ajm3/data/ajm3/general/Locus_List_spptree.txt /users/ajm3/data/ajm3/general/spp_tree_seq_database Array
-/users/ajm3/data/ajm3/scripts/torig_spp_tree_master.py 14April2016 /users/ajm3/data/ajm3/general/GroupList_Ln12.txt /gpfs/scratch/ajm3/eedwards/ /users/ajm3/data/ajm3/ /users/ajm3/data/ajm3/scripts/ /users/ajm3/data/ajm3/general/Locus_List_spptree.txt /users/ajm3/data/ajm3/general/spp_tree_seq_database Array
+torig_spp_tree_master.py GroupDictFN InFolder SeqFolder ScriptPath LLFileName BlastDBName BlastDBFolder Mode
+/users/ajm3/data/ajm3/scripts/torig_spp_tree_master.py 7April2017 /users/ajm3/data/sequences/general/Ln7_Group_List.txt /users/ajm3/data/sequences/analyses_temp/ewg_lane7_20170209/ /users/ajm3/data/sequences/analyses_temp/ewg_lane7_20170209/ /users/ajm3/data/ajm3/scripts/ /users/ajm3/data/ajm3/general/Locus_List_spptree.txt /users/ajm3/data/ajm3/general/spp_tree_seq_database /users/ajm3/data/ajm3/general/spp_tree_blastdbs/ Array
 '''
 
 Usage = '''
@@ -88,24 +87,24 @@ def DictFromFile(FileName, KC, VC):
 
 GroupDict = DictFromFile(GroupDictFN, 0, 1)#GroupDict[GroupName]=GroupPre
 
-NumHrs = 1
+NumHrs = 6
 #make a different script for each group
 if Mode == "Array":
 	SBatchList = [ ]
 for Group in GroupDict:
 	InFolderG = InFolder+Group+"/"
 	SeqFolderG = SeqFolder+Group+"/"
-	OutScript = ['#! /bin/bash\n#SBATCH -J spptree_'+GroupDict[Group]+'\n#SBATCH -t '+str(NumHrs)+':00:00\n#SBATCH -n 1\nmodule load blast\nmodule load spades\n\n']
+	OutScript = ['#! /bin/bash\n#SBATCH -J spptree_'+GroupDict[Group]+'\n#SBATCH -t '+str(NumHrs)+':00:00\n#SBATCH --mem=24G\n#SBATCH -n 1\nmodule load blast\nmodule load spades\n\n']
 	#make the new folder
 	Line = 'mkdir '+InFolderG+'stb_'+GroupDict[Group]+'\n'
-	#OutScript.append(Line)
+	OutScript.append(Line)
 	#run torig_spp_tree_blasting.py
 	#two alternatives for this line
 	#alternative for sequences that are broken up into smaller fasta files
 	Line = ScriptPath+"torig_spp_tree_blasting.py "+InFolderG+" a1_ "+InFolderG+"a1_Num_Ind_Files_List.txt "+BlastDBName+" "+InFolderG+"stb_"+GroupDict[Group]+" stb_ Parallel 4 >> "+InFolderG+Date+"_spptree.log\n"
 	Line += "chmod u+x "+InFolderG+'stb_'+GroupDict[Group]+'/stb_BlastScript1.sh\n'
 	Line += InFolderG+'stb_'+GroupDict[Group]+'/stb_BlastScript1.sh\n'
-	#OutScript.append(Line)
+	OutScript.append(Line)
 	#alternative for sequences that are not broken up into smaller fasta files (directly from gzipped fastq files)
 	Line = "ls "+SeqFolderG+"*.gz | parallel gunzip {}\n"
 	Line += ScriptPath+"trans_fastq_to_2blast.py "+SeqFolderG+" t1_ "+SeqFolderG+Group+"_ind_list.txt "+InFolderG+" a1_ "+BlastDBName+" stb_"+GroupDict[Group]+"/stb_ Parallel 4 None >> "+InFolderG+Date+"_spptree.log\n"
@@ -114,17 +113,17 @@ for Group in GroupDict:
 	#OutScript.append(Line)
 	#parse the blast output and run a spades assembly
 	Line = ScriptPath+"tbaits_blastn_parse.py "+InFolderG+"stb_"+GroupDict[Group]+"/ "+InFolderG+"a1_Num_Ind_Files_List.txt "+LLFileName+" stb_ "+InFolderG+"stb_"+GroupDict[Group]+"/ stb_ >> "+InFolderG+Date+"_spptree.log\n"
-	#OutScript.append(Line)
+	OutScript.append(Line)
 	#**********tblast_to_fastq.py
 	Line = "mkdir "+InFolderG+"sts_"+GroupDict[Group]+"\n"
 	Line += ScriptPath+"tblast_to_fastq.py "+InFolderG+"stb_"+GroupDict[Group]+"/stb_Seqs_to_Loci.txt "+SeqFolderG+" t1_ "+InFolderG+"sts_"+GroupDict[Group]+"/ sts_ separate >> "+InFolderG+Date+"_spptree.log\n"
 	Line += "date >> "+InFolderG+Date+"_spptree.log\n"
-	#OutScript.append(Line)
+	OutScript.append(Line)
 	#running spades a second time
 	Line = "chmod u+x "+InFolderG+"sts_"+GroupDict[Group]+"/spades_script_separate1.sh\n"
 	Line += InFolderG+"sts_"+GroupDict[Group]+"/spades_script_separate1.sh\n"
 	Line += "date >> "+InFolderG+Date+"_spptree.log\n"
-	#OutScript.append(Line)
+	OutScript.append(Line)
 	#***********tassembly_to_loci.py
 	Line = "mkdir "+InFolderG+"sts_final_"+GroupDict[Group]+"\n"
 	Line += "mkdir "+InFolderG+"sts_final_"+GroupDict[Group]+"/spades_contigs\n"
@@ -132,7 +131,7 @@ for Group in GroupDict:
 	Line += "date >> "+InFolderG+Date+"_spptree.log\n"
 	Line += "chmod u+x "+InFolderG+"sts_final_"+GroupDict[Group]+"/spades_contigs/stsb_BlastScript1.sh\n"
 	Line += InFolderG+"sts_final_"+GroupDict[Group]+"/spades_contigs/stsb_BlastScript1.sh\n"
-	#OutScript.append(Line)
+	OutScript.append(Line)
 	#********tbaits_intron_removal.py
 	Line = ScriptPath+"tbaits_to_spptreeseqs.py "+LLFileName+" stsb_ stsc_ "+InFolderG+"sts_final_"+GroupDict[Group]+"/spades_contigs/ same same stsf_  >> "+InFolderG+Date+"_spptree.log\n"
 	OutScript.append(Line)

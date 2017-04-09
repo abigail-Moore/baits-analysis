@@ -295,6 +295,7 @@ OutFileWriting(OutFileName, OutList)
 ISIDict = defaultdict(dict)#ISIDict[Locus][Paralog][Group][Ind][FileGroup]= contig information
 SeqsUsingDict = defaultdict(dict)#SeqsUsingDict[Locus][Paralog][Group][Ind][FileGroup]='yes'/'no'/'contigs'
 IndList = [ ]#The list of all of the individuals that are actually present
+OldIndList = [ ]
 GroupList = [ ]#The list of all of the groups that are actually present
 GroupIndDict = defaultdict(list)#The dictionary of all of the individuals that are actually present in each group
 LastFileGroup = sorted(FileGroupDict.keys())[-1]
@@ -319,8 +320,13 @@ for FileGroup in FileGroupDict:
 			Paralog = Line[1]
 			for IndPos in IndRange:
 				Ind = KeyList[IndPos]
-				Group = IndDict[Ind]
-				SeqInfo = Line[IndPos]
+				try:
+					Group = IndDict[Ind]
+					SeqInfo = Line[IndPos]
+				except KeyError:
+					Group = "oldseq"
+					OldIndList.append(Ind)
+					SeqInfo = ""
 				if SeqInfo != "":
 					SeqInfo = "round "+RoundNum+", "+SeqInfo
 					try:
@@ -341,7 +347,10 @@ for FileGroup in FileGroupDict:
 						print("ERROR!!!  it is not clear if this sequence has been used or not: %s" % (SeqInfo))
 	InFile.close()
 #condensing the IndList to come up with the list of individuals that are actually present:
-IndList = sorted(list(set(IndList)))
+#first, condensing the OldIndList
+OldIndList = sorted(list(set(OldIndList)))
+IndListTemp = sorted(list(set(IndList)))
+IndList = [IndName for IndName in IndListTemp if IndName not in OldIndList]
 #condensing the GroupList to come up with the list of groups that are actually present:
 GroupList = sorted(list(set(GroupList)))
 #making the GroupIndDict to show which individuals are actually present for which groups:

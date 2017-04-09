@@ -35,8 +35,10 @@ in which case we need to have the missing taxa included as question marks]
 [file name for a list of which individuals should be used, or all, if all 
 individuals should be used]
 [method for finding gaps: "Empty" if only gaps count, "List" if all positions 
-that only include the individuals in the list should be removed, or an integer
-if all positions with that many or fewer individuals should be removed]
+that only include the individuals in the list should be removed, an integer
+if all positions with that many or fewer individuals should be removed, or a 
+proportion (< 1) if all positions with that proportion of the individuals or
+fewer should be removed]
 [mode, either Array or Parallel]
 [tree file for outgroup, if OGName is tree]
 [list of individuals whose sequences should be removed if they are the only ones
@@ -147,6 +149,14 @@ def OutFileWriting(FileName, MyList):
 def GapFinder(Meth, AlignTemp, ListTemp):
 	#look through each position of the alignment
 	DictTemp = defaultdict(dict)#DictTemp[GapNum]['start'/'end'] = SeqPos
+	AlLength = len(AlignTemp)
+	if Meth not in ["Empty", "List"]:
+		#if you want at least a certain number of individuals to be present
+		if float(Meth) > 1:
+			MinIndsPresent = int(Meth)
+		#if you want at least a certain proportion of individuals to be present
+		else:
+			MinIndsPresent = float(Meth)*AlLength
 	GapNum = 0
 	GapStart = 0
 	InGap = True
@@ -168,7 +178,7 @@ def GapFinder(Meth, AlignTemp, ListTemp):
 			for record in AlignTemp:
 				if (record[SeqPos] != '-') and (record[SeqPos] != '?'):
 					NumInds += 1
-			if NumInds > int(Meth):
+			if NumInds > MinIndsPresent:
 				GapOnly = False 
 		#four possible combinations of currently in a gap or not and current site is a gap or not
 		#if this is a start of a new sequence segment
@@ -215,6 +225,40 @@ def AlignmentGapRemoving(AlignTemp, DictTemp):
 	return AlignTemp
 	#This is now PAlign
 
+#MissingIndRemoving goes through an alignment once the gaps have been removed and takes out any
+#individuals that then consist entirely of missing data
+def MissingIndRemoving(AlignTemp):
+	MissingSeqDict = { }
+	ListTemp = [ ]
+	#Go through the entire alignment
+	SeqNum = 0
+	for Record in AlignTemp:
+		#If any of the rows consist entirely of missing data,
+		if list(set(list(str(Record.seq)))) == ['-']:
+			#add that sequence to the list of missing sequences
+			MissingSeqDict[SeqNum] = Record.id
+		#if not, add it to the list of good individuals
+		else:
+			ListTemp.append(Record.id)
+		SeqNum += 1
+	#If there are missing sequences, remove them from the alignment
+	if MissingSeqDict != { }:
+		MissingSeqList = sorted(MissingSeqDict.keys())
+		if len(MissingSeqList) == 1:
+			NewAlign = AlignTemp[0:MissingSeqList[0]]
+			NewAlign.extend(AlignTemp[(MissingSeqList[0]+1):(len(AlignTemp))])
+			AlignTemp = NewAlign
+		elif len(MissingSeqList) > 1:
+			NewAlign = AlignTemp[0:MissingSeqList[0]]
+			for PosNum in list(range(len(MissingSeqList))):
+				if PosNum != len(MissingSeqList)-1:
+					NewAlign.extend(AlignTemp[(MissingSeqList[PosNum]+1):MissingSeqList[PosNum+1]])
+				else:
+					NewAlign.extend(AlignTemp[(MissingSeqList[PosNum]+1):len(AlignTemp)])
+			AlignTemp = NewAlign
+	return (AlignTemp, ListTemp)			
+		
+
 #LocusAlSeqGetter reads a series of alignments and makes a dictionary of the sequences
 #that have been classified according to locus.
 def LocusAlSeqGetter(LList,Folder,FilePre,FilePost,SeqFormat):
@@ -253,6 +297,7 @@ def OGNamefromTree(TempTree,TempList):
 	LeavesPruning = [ ]
 	#the tree needs to be copied or it will change the original and _mess_everything_up_!!!!
 	TempTree2 = copy.deepcopy(TempTree)
+	#print(TempTree2.as_ascii_plot(show_internal_node_labels=True))
 	for Node in TempTree2.leaf_nodes():
 		if Node.taxon.label not in TempList:
 			#print("Pruning taxon %s.\n" % (Node.taxon.label))
@@ -279,6 +324,7 @@ def OGNamefromTree(TempTree,TempList):
 	for NodeNum in RootDict:
 		RootedInds += len(RootDict[NodeNum])
 		if len(RootDict[NodeNum]) < SizeSmallerClade:
+			SizeSmallerClade = len(RootDict[NodeNum])
 			ListOG = RootDict[NodeNum]
 	NameTemp = ",".join(ListOG)
 	return(ListOG, NameTemp, RootedInds)
@@ -319,9 +365,9 @@ for Locus in SeqDict:
 	for SeqName in SeqDict[Locus]:
 		#identify which individual each sequence belongs to
 		IndName = SeqName.split(".")[0]
-		if len(SeqName.split(".")) < 4:
+		if len(SeqName.split(".")) < 3:
 			IndName = SeqName.split("-")[0]
-			if len(IndName) == len(SeqName):
+			if len(IndName) > len(SeqName)-2:
 				IndName = SeqName.split(".")[0]
 		#if we want to use all the individuals
 		if IndsUsingFileName == "all":
@@ -361,10 +407,10 @@ for Ind in IndList:
 			IndSeqLenDict[Ind] += SeqLenFinder(SeqIndDict[Locus][Ind])
 		except KeyError:
 			#if not, add gaps to the alignment
-			if OutMode == "separatemb":
-				OutSeqDict[Locus][Ind] = "?"*SeqLenDict[Locus]
-			else:
-				OutSeqDict[Locus][Ind] = "-"*SeqLenDict[Locus]
+			#if OutMode == "separatemb":
+			#	OutSeqDict[Locus][Ind] = "?"*SeqLenDict[Locus]
+			#else:
+			OutSeqDict[Locus][Ind] = "-"*SeqLenDict[Locus]
 			#and add that locus to the list of missing sequences for that individual
 			MissingSeqDict[Ind].append(Locus)
 #determine which sequences will actually be used:
@@ -440,7 +486,7 @@ if (OutMode == "combined") or (OutMode == "combinednobs"):
 	if Mode == 'Parallel':
 		OutList = [ "#! /bin/bash\n\n"]
 	elif Mode == 'Array':
-		OutList = ["#! /bin/bash\n#SBATCH -J concat_tree\n#SBATCH -t 24:00:00\n#SBATCH -n 1\n\nmodule load mafft\nmodule load raxml\n"] 
+		OutList = ["#! /bin/bash\n#SBATCH -J concat_tree\n#SBATCH -t 72:00:00\n#SBATCH -n 1\n#SBATCH --mem=32GB\nmodule load raxml\n"] 
 	Line = ScriptFolder+"fasta_to_phylip.py "+OutFileName+"\n"
 	Line += "rm "+OutFolder+"RAxML_*."+OutFilePre+"combined_"+str(len(GoodInds))+"inds_"+str(len(GoodSeqs))+"seqs\n"
 	if OutMode == "combined":
@@ -471,13 +517,28 @@ elif OutMode == 'separatemb':
 			OutFileName = OutFolder+OutFilePre+Locus+"_mb.fa"
 			AlignGaps = 0
 			for Ind in GoodInds:
+				#The version if you want to add blank lines for the missing individuals
+				'''
 				Record1 = SeqRecord(seq=Seq(OutSeqDict[Locus][Ind]), id = Ind, description = "")
 				try:
 					AlignGaps.append(Record1)
 				except AttributeError:
 					AlignGaps = MultipleSeqAlignment([Record1])
+				'''
+				#The version if you want to leave them out:
+				try:
+					Record1 = SeqRecord(seq=Seq(SeqIndDict[Locus][Ind]), id = Ind, description = "")
+					try:
+						AlignGaps.append(Record1)
+					except AttributeError:
+						AlignGaps = MultipleSeqAlignment([Record1])
+				except KeyError:
+					"do not add that sequence, because it doesn't exist"
 			GapPosDict = GapFinder(Method, AlignGaps, LongSeqList)
-			AlignOut = AlignmentGapRemoving(AlignGaps, GapPosDict)
+			AlignNoGaps = AlignmentGapRemoving(AlignGaps, GapPosDict)
+			(AlignOut, SeqsUsing) = MissingIndRemoving(AlignNoGaps)
+			if len(AlignNoGaps) != len(AlignOut):
+				print("%d sequences that were only gaps were removed." % (len(AlignNoGaps)-len(AlignOut)))
 			AlignIO.write(AlignOut, OutFileName, "fasta")
 			Line = ScriptFolder+"fasta_to_nexus_mb.py "+OutFilePre+Locus+"_mb.fa && "
 			Line += "mb < "+OutFilePre+Locus+"_mb_mb.nex > "+OutFilePre+Locus+"_mb.log\n"
@@ -500,18 +561,33 @@ elif OutMode == 'separatemb':
 			OutFileName = OutFolder+OutFilePre+Locus+"_mb.fa"
 			AlignGaps = 0
 			for Ind in GoodInds:
+				#The version if you want to add blank lines for the missing individuals
+				'''
 				Record1 = SeqRecord(seq=Seq(OutSeqDict[Locus][Ind]), id = Ind, description = "")
 				try:
 					AlignGaps.append(Record1)
 				except AttributeError:
 					AlignGaps = MultipleSeqAlignment([Record1])
+				'''
+				#The version if you want to leave them out:
+				try:
+					Record1 = SeqRecord(seq=Seq(SeqIndDict[Locus][Ind]), id = Ind, description = "")
+					try:
+						AlignGaps.append(Record1)
+					except AttributeError:
+						AlignGaps = MultipleSeqAlignment([Record1])
+				except KeyError:
+					"do not add that sequence, because it doesn't exist"
 			GapPosDict = GapFinder(Method, AlignGaps, LongSeqList)
-			AlignOut = AlignmentGapRemoving(AlignGaps, GapPosDict)
+			AlignNoGaps = AlignmentGapRemoving(AlignGaps, GapPosDict)
+			(AlignOut, SeqsUsing) = MissingIndRemoving(AlignNoGaps)
+			if len(AlignNoGaps) != len(AlignOut):
+				print("%d sequences that were only gaps were removed." % (len(AlignNoGaps)-len(AlignOut)))
 			AlignIO.write(AlignOut, OutFileName, "fasta")
 			Line = ScriptFolder+"fasta_to_nexus_mb.py "+OutFilePre+Locus+"_mb.fa\n"
 			Line += "mb < "+OutFilePre+Locus+"_mb_mb.nex > "+OutFilePre+Locus+"_mb.log\n"
 			OutScript.append(Line)
-			if NumLoci == 5:
+			if NumLoci == 3:
 				OutFileWriting(OutScriptName, OutScript)
 				OutLine = "sbatch "+OutScriptName
 				SBatchOut = subprocess.Popen(OutLine, shell=True, stdout=subprocess.PIPE).communicate()[0]
@@ -553,21 +629,24 @@ elif OutMode == 'separate':
 				except KeyError:
 					"do not add that sequence, because it doesn't exist"
 			GapPosDict = GapFinder(Method, AlignGaps, LongSeqList)
-			AlignOut = AlignmentGapRemoving(AlignGaps, GapPosDict)
+			AlignNoGaps = AlignmentGapRemoving(AlignGaps, GapPosDict)
+			(AlignOut, SeqsUsing) = MissingIndRemoving(AlignNoGaps)
+			if len(AlignNoGaps) != len(AlignOut):
+				print("%d sequences that were only gaps were removed." % (len(AlignNoGaps)-len(AlignOut)))
 			AlignIO.write(AlignOut, OutFileName, "fasta")
 			Line = "rm "+OutFolder+"RAxML_*."+OutFilePre+Locus+"\n"
 			OutList1.append(Line)
-			Line = ScriptFolder+"fasta_to_phylip.py "+OutFileName+" && "
-			if OGName == "none":
-				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -w "+OutFolder+"\n"
-			elif OGName == "tree":
-				(OGListLocus, LocusOG, NumRootedTree) = OGNamefromTree(SppTree, LocusIndList)
-				if len(LocusIndList) != NumRootedTree:
-					sys.exit("ERROR!!!!!  For locus %s, we started out with %d individuals and %d individuals were in the final tree.  These numbers should be the same!!!!" % (Locus, len(LocusIndList), NumRootedTree))
-				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+LocusOG+" -w "+OutFolder+"\n"
-			else:
-				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OGName+" -w "+OutFolder+"\n"
 			if len(LocusIndList) > 3:
+				Line = ScriptFolder+"fasta_to_phylip.py "+OutFileName+" && "
+				if OGName == "none":
+					Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -w "+OutFolder+"\n"
+				elif OGName == "tree":
+					(OGListLocus, LocusOG, NumRootedTree) = OGNamefromTree(SppTree, SeqsUsing)
+					if len(SeqsUsing) != NumRootedTree:
+						sys.exit("ERROR!!!!!  For locus %s, we started out with %d individuals and %d individuals were in the final tree.  These numbers should be the same!!!!" % (Locus, len(LocusIndList), NumRootedTree))
+					Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+LocusOG+" -w "+OutFolder+"\n"
+				else:
+					Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OGName+" -w "+OutFolder+"\n"
 				OutList2.append(Line)
 		print("%d sequence files were written, with names such as %s.\n" % (len(GoodSeqs), OutFileName))
 		sys.stderr.write("%d sequence files were written, with names such as %s.\n" % (len(GoodSeqs), OutFileName))
@@ -586,9 +665,10 @@ elif OutMode == 'separate':
 		NumLoci = 0
 		LocusGroup = 1
 		SBatchList = [ ]
-		OutScript = ["#! /bin/bash\n#SBATCH -J "+str(LocusGroup)+"_genetrees\n#SBATCH -t 6:00:00\n#SBATCH -n 1\nmodule load raxml\n"]
+		OutScript = ["#! /bin/bash\n#SBATCH -J "+str(LocusGroup)+"_genetrees\n#SBATCH -t 10:00:00\n#SBATCH -n 1\nmodule load raxml\n"]
 		OutScriptName = OutFolder+OutFilePre+"Grp_"+str(LocusGroup)+"_script.sh"
 		for Locus in GoodSeqs:
+			print Locus
 			OutFileName = OutFolder+OutFilePre+Locus+".fa"
 			AlignGaps = 0
 			LocusIndList = [ ]
@@ -603,22 +683,25 @@ elif OutMode == 'separate':
 				except KeyError:
 					"do not add that sequence, because it doesn't exist"
 			GapPosDict = GapFinder(Method, AlignGaps, LongSeqList)
-			AlignOut = AlignmentGapRemoving(AlignGaps, GapPosDict)
+			AlignNoGaps = AlignmentGapRemoving(AlignGaps, GapPosDict)
+			(AlignOut, SeqsUsing) = MissingIndRemoving(AlignNoGaps)
+			if len(AlignNoGaps) != len(AlignOut):
+				print("%d sequences that were only gaps were removed." % (len(AlignNoGaps)-len(AlignOut)))
 			AlignIO.write(AlignOut, OutFileName, "fasta")
 			Line = "rm "+OutFolder+"RAxML_*."+OutFilePre+Locus+"\n"
 			OutScript.append(Line)
-			Line = ScriptFolder+"fasta_to_phylip.py "+OutFileName+"\n"
-			if OGName == "none":
-				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -w "+OutFolder+"\n"
-			elif OGName == "tree":
-				(OGListLocus, LocusOG, NumRootedTree) = OGNamefromTree(SppTree, LocusIndList)
-				if len(LocusIndList) != NumRootedTree:
-					sys.exit("ERROR!!!!!  For locus %s, we started out with %d individuals and %d individuals were in the final tree.  These numbers should be the same!!!!" % (Locus, len(LocusIndList), NumRootedTree))
-				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+LocusOG+" -w "+OutFolder+"\n"
-			else:
-				Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OGName+" -w "+OutFolder+"\n"
 			if len(LocusIndList) > 3:
 				NumLoci += 1
+				Line = ScriptFolder+"fasta_to_phylip.py "+OutFileName+"\n"
+				if OGName == "none":
+					Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -w "+OutFolder+"\n"
+				elif OGName == "tree":
+					(OGListLocus, LocusOG, NumRootedTree) = OGNamefromTree(SppTree, SeqsUsing)
+					if len(SeqsUsing) != NumRootedTree:
+						sys.exit("ERROR!!!!!  For locus %s, we started out with %d individuals and %d individuals were in the final tree.  These numbers should be the same!!!!" % (Locus, len(LocusIndList), NumRootedTree))
+					Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+LocusOG+" -w "+OutFolder+"\n"
+				else:
+					Line += "raxmlHPC -s "+OutFolder+OutFilePre+Locus+".phy -n "+OutFilePre+Locus+" -m GTRCAT -p 1234 -f a -N 100 -x 1234 -o "+OGName+" -w "+OutFolder+"\n"
 				OutScript.append(Line)
 			if NumLoci == 5:
 				OutFileWriting(OutScriptName, OutScript)
@@ -653,4 +736,3 @@ elif OutMode == 'separate':
 		SBatchOut = subprocess.Popen(OutLine, shell=True, stdout=subprocess.PIPE).communicate()[0]
 		print("The script %s will be run after these groups of loci have all been analyzed.\n" % (OutScriptName))
 		sys.stderr.write("The script %s will be run after these groups of loci have all been analyzed.\n" % (OutScriptName))
-

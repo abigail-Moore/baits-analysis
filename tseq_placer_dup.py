@@ -471,16 +471,14 @@ def OutFileWriting(FileName, MyList):
 #It writes a script that adds the sequences to the file of pre-existing
 #sequences for that locus and then aligns them.
 def AMScriptWriter(SeqFileDict, Folder, Prefix, AFolder, APre, APost):
-	OutList = ["#! /bin/bash\n"]
-	OutList2 = [ ]
+	OutList = [ ]
 	for Locus in SeqFileDict:
 		for Paralog in SeqFileDict[Locus]:
 			NamePart = SeqFileDict[Locus][Paralog]
-			Line = "rm "+Folder+NamePart+"_pars_al.fa\n"
-			OutList.append(Line)
+			#Line = "rm "+Folder+NamePart+"_pars_al.fa\n"
+			#OutList.append(Line)
 			Line = "mafft --addfragments "+Folder+NamePart+".fa --quiet --thread -1 "+AFolder+APre+Locus+APost+".fa > "+Folder+NamePart+"_pars_al.fa\n"
-			OutList2.append(Line)
-	OutList += OutList2
+			OutList.append(Line)
 	OutFileName = Folder+Prefix+"Analysis_Script.sh"
 	OutFileWriting(OutFileName, OutList)
 	print("The shell script for analyzing the sequences further was written to %s.\n" % (OutFileName))

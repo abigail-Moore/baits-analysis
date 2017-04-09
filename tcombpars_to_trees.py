@@ -289,13 +289,13 @@ if Mode == 'Parallel':
 elif Mode == 'Array':
 	SBatchList = [ ]
 	for Locus in LocusList:
-		OutList = ["#! /bin/bash\n#SBATCH -J "+OutFilePre+Locus+"\n#SBATCH -t 12:00:00\n"]
+		OutList = ["#! /bin/bash\n#SBATCH -J "+OutFilePre+Locus+"\n"]
 		if SeqsperLocus[Locus] < 100:
-			Line = "#SBATCH -n 1\n"
+			Line = "#SBATCH -t 12:00:00\n#--mem=4GB\n"
 		elif SeqsperLocus[Locus] < 200:
-			Line = "#SBATCH -n 2\n"
+			Line = "#SBATCH -t 16:00:00\n#--mem=8GB\n"
 		else:
-			Line = "#SBATCH -n 4\n"
+			Line = "#SBATCH -t 24:00:00\n#--mem=16GB\n"
 		Line += "module load mafft\nmodule load raxml\n"
 		OutList.append(Line)
 		#Align, change to phylip

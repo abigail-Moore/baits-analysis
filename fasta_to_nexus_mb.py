@@ -44,11 +44,15 @@ AlignIO.write(MyAlignment,OutFileName,'nexus')
 
 OutList = [ ]
 Line = "set autoclose=yes nowarn=yes\nexecute "+OutFileName+"\n"
-Line += "lset nst=6 rates=invgamma\nunlink statefreq=(all) revmat=(all) shape=(all) pinvar=(all)\n"
+#Line += "lset nst=6 rates=invgamma\nunlink statefreq=(all) revmat=(all) shape=(all) pinvar=(all)\n"
+#OutList.append(Line)
+#Line = "prset ratepr=variable\nmcmcp ngen= 4000000 relburnin=yes burninfrac=0.25  printfreq=10000  samplefreq=1000 nruns=2 nchains=4 savebrlens=yes\n"
+#OutList.append(Line)
+#Line = "mcmc\nsumt\nquit\n"
+#OutList.append(Line)
+Line += "lset nst=6 rates=gamma;\nmcmc ngen=4000000 samplefreq=4000 printfreq=4000 diagnfreq=20000;\n"
 OutList.append(Line)
-Line = "prset ratepr=variable\nmcmcp ngen= 4000000 relburnin=yes burninfrac=0.25  printfreq=10000  samplefreq=1000 nruns=2 nchains=4 savebrlens=yes\n"
-OutList.append(Line)
-Line = "mcmc\nsumt\nquit\n"
+Line = "sumt relburnin=yes burninfrac=0.25;\nquit\n"
 OutList.append(Line)
 
 OutFileName = InFileName[:-3]+"_mb.nex"

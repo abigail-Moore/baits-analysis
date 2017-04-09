@@ -575,6 +575,18 @@ def SegAlMaker(SegNum, SegDictIn, GContigList, OldAlign):
 	return NewAlign
 	#This is SegmentAlign or SegmentGroupAlign
 
+#ContigListMaker makes a list of contigs from individuals that are in the IndDict
+def ContigListMaker(ConListIn, IDict):
+	ConListOut = [ ]
+	for ConName in ConListIn:
+		Ind = ConName.split("-")[0]
+		try:
+			Group = IDict[Ind]
+			ConListOut.append(ConName)
+		except KeyError:
+			if Verbose == True: print("Individual %s not in dictionary and will be ignored.\n" % (Ind))
+	return ConListOut
+
 #HeaderDDPrinting
 #This prints a dictionary into a file with a header.  The dictionary should have 4 levels of keys:
 #The first and second keys are the first and second columns; the third key is used to sort the fourth keys; the fourth key is in the header.
@@ -657,7 +669,11 @@ for Locus in ParalogDict:
 		#I want two versions of the alignment.  One with each group separately and one with everything together.
 		#first for everything together:
 		#making a dictionary that includes only the contigs that belong to that segment
-		SegmentAlign = SegAlMaker(SelectedSeg, SegMemDict, "all", PAlign)
+		AllContigList = [ ]
+		for SegNum in SegMemDict:
+			AllContigList += SegMemDict[SegNum]['ContigList']
+		NewContigList = ContigListMaker(AllContigList,IndDict)
+		SegmentAlign = SegAlMaker(SelectedSeg, SegMemDict, NewContigList, PAlign)
 		#adding those individuals to the ISIDict
 		for record in SegmentAlign:
 			Ind = record.id.split("-")[0]
@@ -672,7 +688,8 @@ for Locus in ParalogDict:
 		#then for each group separately:
 		for Group in ParalogDict[Locus][Paralog]:
 			if Group != "all":
-				SegmentAlignGroup = SegAlMaker(SelectedSeg, SegMemDict, ParalogDict[Locus][Paralog][Group], PAlign)
+				NewGroupContigList = ContigListMaker(ParalogDict[Locus][Paralog][Group], IndDict)
+				SegmentAlignGroup = SegAlMaker(SelectedSeg, SegMemDict, NewGroupContigList, PAlign)
 				OutFileName = SeqFilePath+Group+"/"+SeqFolderPre+GroupDict[Group]+"/"+SeqFolderPost+SeqFilePre+Paralog+"seg_"+str(SelectedSeg)+".fa"
 				if (SeqFolderPre == "") and (GroupDict[Group] == ""):
 					OutFileName = SeqFilePath+Group+"/"+SeqFolderPost+SeqFilePre+Paralog+"seg_"+str(SelectedSeg)+".fa"

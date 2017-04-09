@@ -224,7 +224,8 @@ def SeqFileWriting(FileName, SDict, SeqFormat):
 
 #DuplicationFinder goes through each node on the the Notung tree and determines whether an actual duplication has occurred
 #original
-def DuplicationFinder(TempTree):
+#It also requires IndGroupDict, or GroupDict[IndName] = GroupName.
+def DuplicationFinder(TempTree, GroupDict):
 	if Vociferous == True: print("Resolving duplications due to incongruences between the gene tree and the species tree.\n")
 	NDs = 0
 	NDNs = 0
@@ -232,21 +233,30 @@ def DuplicationFinder(TempTree):
 		if Node.label == "Y":
 			NDs += 1
 			ParNum = 1
-			DictTemp = defaultdict(list)
+			DictTempI = defaultdict(list)
+			DictTempG = defaultdict(list)
 			#if it did, finding out which individuals are daughters of that node
 			for Child_Node in Node.child_node_iter():
 				for Daughter_Node in Child_Node.leaf_nodes():
-					DictTemp[ParNum].append(GetIndName(Daughter_Node.taxon.label))
+					IName = GetIndName(Daughter_Node.taxon.label)
+					DictTempI[ParNum].append(IName)
+					DictTempG[ParNum].append(GroupDict[IName])
 				ParNum += 1
-			#if none of the individuals are present twice, there probably isn't really a duplication at that node.
+			#if none of the individuals are present twice, there may not really be a duplication at that node and it needs to be tested further.
 			#It is more likely that the species and gene trees are incongruent.
-			OVSet = set(DictTemp[1]).intersection(DictTemp[2])
-			if len(OVSet) == 0:
+			OVSetI = set(DictTempI[1]).intersection(DictTempI[2])
+			OVSetG = set(DictTempG[1]).intersection(DictTempG[2])
+			if len(OVSetI) == 0:
 				if Vociferous == True: print("All taxa present only once!")
 				#so changing the node label so that there is no duplication
 				Node.label = "N"
+				#But also testing the groups and keeping the duplication if more than one group is present on both sides.
+				if len(OVSetG) > 1:
+					if Vociferous == True: print("%d groups are present on both sides of the duplication!" % (len(OVSetG)))
+					#so changing the node back to a duplication
+					Node.label = "Y"
 			#numbering the duplication, if we accept it
-			else:
+			if Node.label == "Y":
 				NDNs += 1
 				Node.label = "Y"+str(NDNs)
 		elif not Node.label:
@@ -291,7 +301,7 @@ def SeqCombiner(TempTree, InSeqDict):
 				if Vociferous == True: print("There were few enough duplicated individuals, that we will try to combine their sequences.\n")
 				#for each of those individuals, try to combine its sequences
 				for IndName in DupInds:
-					#if Vociferous == True: print("Individual %s has the following sequences: %s.\n" % (IndName, ", ".join(DaughterDict[IndName])))
+					if Vociferous == True: print("Individual %s has the following sequences: %s.\n" % (IndName, ", ".join(DaughterDict[IndName])))
 					(ConSeq, NumAmbig, AmbigSitesList, NumSeqs, Overlap) = ConSeqMaker(InSeqDict, DaughterDict[IndName])
 					if NumAmbig < 5:
 						CombinableInds.append(IndName)
@@ -311,6 +321,12 @@ def SeqCombiner(TempTree, InSeqDict):
 								NumSeqsTot += int(SeqName.split("seqs")[0].split(".")[-1])-1
 								NumAmbigsTot += int(SeqName.split("ambig")[0].split(".")[-1])
 						NewSeqName = ".".join([IndName, ParNameList[0], str(NumSeqsTot)+"seqs", str(NumAmbigsTot)+"ambig", "len"+str(SeqLenFinder(ConSeq))])
+						try:
+							SeqTemp = InSeqDict[NewSeqName]
+							NewSeqName = NewSeqName+"_b"
+							if Vociferous == True: print("Although the sequences were combinable, a sequence with that name already existed, so the combined sequence is now %s.\n" % (NewSeqName))
+						except KeyError:
+							"do not rename the contig"
 						InSeqDict[NewSeqName] = ConSeq
 						#deleting the shorter sequences from the tree
 						LengthLongest = 0
@@ -321,6 +337,7 @@ def SeqCombiner(TempTree, InSeqDict):
 								LengthLongest = SeqLen
 								LongestSeq = SeqName
 						for SeqName in DaughterDict[IndName]:
+							print SeqName
 							#remove shorter sequences
 							if SeqName != LongestSeq:
 								RemoveList.append(SeqName)
@@ -781,7 +798,7 @@ for Locus in LocusList:
 		AlFileName = AlFolder+AlFilePre+Locus+AlFilePost+".fa"
 		LocusAl_orig = SeqFileReading(AlFileName, 'fasta')
 		#going through each node in the tree and determining whether Notung reconstructed a duplication at that node
-		(LocusTree_new) = DuplicationFinder(LocusTree_orig)
+		(LocusTree_new) = DuplicationFinder(LocusTree_orig, IndGroupDict)
 		#Go through the duplications and try to combine the sequences that can be combined
 		(LocusTree_pruned, NewSeqDict) = SeqCombiner(LocusTree_new, LocusAl_orig)
 		#choose the longer sequence for each duplication involving only one individual that could not be successfully resolved

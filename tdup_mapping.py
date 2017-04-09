@@ -25,7 +25,7 @@ import dendropy
 '''
 tdup_mapping.py ~/transcriptomes/combined_Ln12_tr/Ln12s_prunedgenetrees/RAxML_bipartitions.Ln12spgt_combined_64inds_185seqs_rooted ~/transcriptomes/combined_Ln12_tr/tomovespades/Ln12sgt_dup_pos_dict_head.txt
 tdup_mapping.py ~/transcriptomes/general/spp_tree_Ln12_ts_comb_nn ~/transcriptomes/combined_Ln12_tr/tomovespades/Ln12sgt_dup_pos_dict.txt ~/transcriptomes/combined_Ln12_tr/tomovespades/Ln12sgt_tree_dups_mapped
-tdup_mapping.py SppTreeFN DPDFN OutFileName
+tdup_mapping.py SppTreeFN DPDFN OutFileName DecPlaces[none, two]
 '''
 
 Usage = '''
@@ -37,15 +37,22 @@ tdup_mapping.py
 [dup_pos_dict.txt file produced by tnotung_homolog_parsing.py]
 [name for the output tree file with number of duplications mapped as node 
 labels]
+[number of decimal places to be shown for duplication node labels, "none" for 
+none (what FigTree needs) or "two" for 2]
 '''
+
+DecPlacesList = ["none", "two"]
 
 print("%s\n" % (" ".join(sys.argv)))
 
-if len(sys.argv) != 4:
-	sys.exit("ERROR!  This script requires 3 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
+if len(sys.argv) != 5:
+	sys.exit("ERROR!  This script requires 4 additional arguments and you supplied %d.\n %s" % (len(sys.argv)-1, Usage))
 SppTreeFN = sys.argv[1]
 DPDFN = sys.argv[2]
 OutFileName = sys.argv[3]
+DecPlaces = sys.argv[4]
+if DecPlaces not in DecPlacesList:
+	sys.exit ("ERROR!  The number of decimal places can only be %s, and you wrote %s.\n%s" % (", ".join(DecPlacesList), DecPlaces, Usage))
 
 Verbose = False
 ShowTrees = False
@@ -174,12 +181,15 @@ for Node in SppTree.preorder_node_iter():
 	else:
 		#This is where you decide if you want whole numbers for the node labels and, if not, how many decimal places you want the labels to have.
 		#However, figtree has a problem reading node labels with decimal places.
-		#print Node.label
-		Node.label = str(int(Node.label))
-		#if ((Node.label % 1) == 0):
-		#	Node.label = str(int(Node.label))
-		#else:
-		#	Node.label = ("%.2f" % (Node.label))
+		#node labels without decimal places
+		if DecPlaces == "none":
+			Node.label = str(int(round(float(Node.label))))
+		#node labels with decimal places:
+		elif DecPlaces == "two":
+			if ((Node.label % 1) == 0):
+				Node.label = str(int(Node.label))
+			else:
+				Node.label = ("%.2f" % (Node.label))
 		#print Node.label
 		
 if ShowTrees == True: print(SppTree.as_ascii_plot(show_internal_node_labels=True))

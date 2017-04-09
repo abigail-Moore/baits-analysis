@@ -573,6 +573,7 @@ elif Mode == "Array":
 		OutScript.append("#SBATCH -J "+OutFilePre+Locus+"\n")
 		OutScript.append("#SBATCH -t 12:00:00\n")
 		OutScript.append("#SBATCH -n 1\n")
+		OutScript.append("#SBATCH --mem=8G\n")
 		Line = "module load mafft\nmodule load raxml\n"
 		OutScript.append(Line)
 		#if we don't need to add any new sequences to that locus

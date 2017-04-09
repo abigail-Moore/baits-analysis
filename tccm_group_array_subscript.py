@@ -250,7 +250,7 @@ sys.stderr.write("%d separate jobs were submitted to analyze the groups for roun
 
 #Submitting the next script
 OutScript = ['#! /bin/bash\n#SBATCH -J '+OutFilePre+str(RoundNum)+'_comb\n#SBATCH -t 1:00:00\n\n\n']
-Line = "mkdir "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"\n"
+Line = "rm -r  "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"\nmkdir "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"\n"
 OutScript.append(Line)
 if RoundNum != NRounds:
 	#add the new sequences to the original backbone trees for the first round

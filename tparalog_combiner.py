@@ -549,6 +549,8 @@ elif Mode == "Array":
 		#giving more cores to large alignments
 		if (SeqsperLocus[Locus] > 50) or (Locus in ["ppc1", "ppc2"]):
 			OutScript.append("#SBATCH --mem=16G\n")
+		else:
+			OutScript.append("#SBATCH --mem=4G\n")
 		Line = "module load mafft\nmodule load raxml\n"
 		OutScript.append(Line)
 		Line = "rm "+OutFolder+OutFilePre+Locus+"_allseqs_al.fa\n"
@@ -583,7 +585,11 @@ elif Mode == "Array":
 	OutFileName = OutFolder+OutFilePre+"Analysis_Script.sh"
 	OutFileWriting(OutFileName, OutScript)
 	#this will take place only after the job arrays for all of the individuals have been run.
-	OutLine = "sbatch -d afterok:"+":".join(SBatchList)+" "+OutFileName
+	if len(SBatchList) > 0:
+		OutLine = "sbatch -d afterok:"+":".join(SBatchList)+" "+OutFileName
+	#But it is possible that everything has been run, in which case it will just make the next files.
+	else:
+		OutLine = "sbatch "+OutFileName
 	SBatchOut = subprocess.Popen(OutLine, shell=True, stdout=subprocess.PIPE).communicate()[0]
 	JobIDPrev = SBatchOut.strip('\r').strip('\n').split(" ")[-1]
 	print("The subsequent script will be run with the job id %s, when the previous scripts have finished.\n" % (JobIDPrev))

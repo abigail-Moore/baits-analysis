@@ -182,7 +182,7 @@ elif Mode == "Array":
 	Line = "#! /bin/bash\n#SBATCH -J "+OutFilePre+"\n#SBATCH -t 2:00:00\n#SBATCH --mem=16G\n\n"
 OutScript = [ ]
 
-Line += "date >> "+OutFolder+Date+"_"+OutFilePre+".log\nmodule load mafft\nmodule load raxml\n"
+Line += "date >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\nmodule load mafft\nmodule load raxml\n"
 OutScript.append(Line)
 for Group in GroupDict:
 	#this bit is very simple, so it doesn't need to be run in parallel.
@@ -192,12 +192,12 @@ for Group in GroupDict:
 		DataPath1 = DataFolder+Group+"/"+DataFolder2Pre
 	DataPath = DataPath1+OutFilePre
 	#preparing the folders and running tbaits_intron_removal.py
-	Line = "mkdir "+DataPath+"_exons/\n"
-	Line += "mkdir "+DataPath+"_paralogs/\n"
-	Line += "mkdir "+DataPath+"_sequences/\n"
+	Line = "rm -r "+DataPath+"_exons/\nmkdir "+DataPath+"_exons/\n"
+	Line += "rm -r "+DataPath+"_paralogs\nmkdir "+DataPath+"_paralogs/\n"
+	Line += "rm -r "+DataPath+"_sequences\nmkdir "+DataPath+"_sequences/\n"
 	OutScript.append(Line)
-	Line = ScriptFolder+"tbaits_intron_removal.py "+LPFileName+" "+BSFilePre+"b3_ "+BSFilePre+"c_ "+DataPath1+"contigs/ same "+DataPath+"_exons/ "+OutFilePre+"e1_ "+OGFileName+" "+AlFolder+" "+AlFilePre+" "+AlFilePost+" "+ScriptFolder2+" >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
-	Line += "date >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+	Line = ScriptFolder+"tbaits_intron_removal.py "+LPFileName+" "+BSFilePre+"b3_ "+BSFilePre+"c_ "+DataPath1+"contigs/ same "+DataPath+"_exons/ "+OutFilePre+"e1_ "+OGFileName+" "+AlFolder+" "+AlFilePre+" "+AlFilePost+" "+ScriptFolder2+" >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
+	Line += "date >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 	OutScript.append(Line)
 if Mode == "Parallel":
 	for RoundNum in range(1,NRounds+1):
@@ -218,33 +218,33 @@ if Mode == "Parallel":
 			if RoundNum != 1:
 				Line = "chmod u+x "+DataPath+"_exons/"+OutFilePre+"e"+str(RoundNum)+"_Analysis_Script.sh\n"
 				Line += DataPath+"_exons/"+OutFilePre+"e"+str(RoundNum)+"_Analysis_Script.sh\n"
-				Line += "date >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+				Line += "date >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 				OutScriptGroup.append(Line)
 			'''
 			#and the option for if they haven't been
 			Line = "chmod u+x "+DataPath+"_exons/"+OutFilePre+"e"+str(RoundNum)+"_Analysis_Script.sh\n"
 			Line += DataPath+"_exons/"+OutFilePre+"e"+str(RoundNum)+"_Analysis_Script.sh\n"
-			Line += "date >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+			Line += "date >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 			OutScriptGroup.append(Line)
 			#**************Is this even adding the stuff to the right tree????*********************
 			if RoundNum != NRounds:
 				#******tseq_placer_dup.py (merge)
-				Line = ScriptFolder+"tseq_placer_dup.py "+LLFileName+" "+ParDictFileName+" "+DataPath+"_exons/ "+OutFilePre+"e"+str(RoundNum)+"_ none same "+OutFilePre+"e"+str(RoundNum)+"_ "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+AlFolder+" "+AlFilePre+" "+AlFilePost+" 0.10 merge >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+				Line = ScriptFolder+"tseq_placer_dup.py "+LLFileName+" "+ParDictFileName+" "+DataPath+"_exons/ "+OutFilePre+"e"+str(RoundNum)+"_ none same "+OutFilePre+"e"+str(RoundNum)+"_ "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+AlFolder+" "+AlFilePre+" "+AlFilePost+" 0.10 merge >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 			else:
 				#********tseq_placer_dup.py (separate)
-				Line = ScriptFolder+"tseq_placer_dup.py "+LLFileName+" "+OutFolder+OutFilePre+"_round"+str(RoundNum-1)+"/"+OutFilePre+"rnd"+str(RoundNum-1)+"_pardict_new.txt "+DataPath+"_exons/ "+OutFilePre+"e"+str(RoundNum)+"_ none same "+OutFilePre+"e"+str(RoundNum)+"_ "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+OutFolder+OutFilePre+"_round"+str(RoundNum-1)+"/ "+OutFilePre+"rnd"+str(RoundNum-1)+"_ _allseqs_al 0.10 separate >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+				Line = ScriptFolder+"tseq_placer_dup.py "+LLFileName+" "+OutFolder+OutFilePre+"_round"+str(RoundNum-1)+"/"+OutFilePre+"rnd"+str(RoundNum-1)+"_pardict_new.txt "+DataPath+"_exons/ "+OutFilePre+"e"+str(RoundNum)+"_ none same "+OutFilePre+"e"+str(RoundNum)+"_ "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+OutFolder+OutFilePre+"_round"+str(RoundNum-1)+"/ "+OutFilePre+"rnd"+str(RoundNum-1)+"_ _allseqs_al 0.10 separate >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 			Line += "chmod u+x "+DataPath+"_paralogs/"+OutFilePre+"p"+str(RoundNum)+"_Analysis_Script.sh\n"
 			Line += DataPath+"_paralogs/"+OutFilePre+"p"+str(RoundNum)+"_Analysis_Script.sh\n"
 			OutScriptGroup.append(Line)
 			if RoundNum != NRounds:
 				#******tcontigs_to_fixed_paralogs.py (intermediate)
-				Line = ScriptFolder+"tcontigs_to_fixed_paralogs.py "+DataPath+"_paralogs/"+OutFilePre+"p"+str(RoundNum)+"_Contig_Groups.txt "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+DataPath+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ "+DataPath+"_exons/ "+OutFilePre+"e"+str(RoundNum+1)+"_ "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ScriptFolder2+" "+OGFileName+" intermediate none 0 "+OutFilePre+"e"+str(RoundNum)+"_ >> "+OutFolder+Date+"_"+OutFilePre+".log\n\n"
+				Line = ScriptFolder+"tcontigs_to_fixed_paralogs.py "+DataPath+"_paralogs/"+OutFilePre+"p"+str(RoundNum)+"_Contig_Groups.txt "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+DataPath+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ "+DataPath+"_exons/ "+OutFilePre+"e"+str(RoundNum+1)+"_ "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ScriptFolder2+" "+OGFileName+" intermediate none 0 "+OutFilePre+"e"+str(RoundNum)+"_ >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n\n"
 			else:
 				#********tcontigs_to_fixed_paralogs.py (final/finalpoly)
 				if Group in PolyList:
-					Line = ScriptFolder+"tcontigs_to_fixed_paralogs.py "+DataPath+"_paralogs/"+OutFilePre+"p"+str(RoundNum)+"_Contig_Groups.txt "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+DataPath+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ same none "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ScriptFolder2+" "+OGFileName+" finalpoly "+DataFolder+Group+"/"+GroupDict[Group]+"_poly.txt 2.5 "+OutFilePre+"e"+str(RoundNum)+"_ >> "+OutFolder+Date+"_"+OutFilePre+".log\n\n"
+					Line = ScriptFolder+"tcontigs_to_fixed_paralogs.py "+DataPath+"_paralogs/"+OutFilePre+"p"+str(RoundNum)+"_Contig_Groups.txt "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+DataPath+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ same none "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ScriptFolder2+" "+OGFileName+" finalpoly "+DataFolder+Group+"/"+GroupDict[Group]+"_poly.txt 2.5 "+OutFilePre+"e"+str(RoundNum)+"_ >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n\n"
 				else:
-					Line = ScriptFolder+"tcontigs_to_fixed_paralogs.py "+DataPath+"_paralogs/"+OutFilePre+"p"+str(RoundNum)+"_Contig_Groups.txt "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+DataPath+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ same none "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ScriptFolder2+" "+OGFileName+" final none 0 "+OutFilePre+"e"+str(RoundNum)+"_ >> "+OutFolder+Date+"_"+OutFilePre+".log\n\n"
+					Line = ScriptFolder+"tcontigs_to_fixed_paralogs.py "+DataPath+"_paralogs/"+OutFilePre+"p"+str(RoundNum)+"_Contig_Groups.txt "+DataPath+"_paralogs/ "+OutFilePre+"p"+str(RoundNum)+"_ "+DataPath+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ same none "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ScriptFolder2+" "+OGFileName+" final none 0 "+OutFilePre+"e"+str(RoundNum)+"_ >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n\n"
 			OutScriptGroup.append(Line)
 			OutFileWriting(OutScriptGroupName, OutScriptGroup)
 		OutFileWriting(GroupFileListName, GroupFileList)
@@ -253,15 +253,15 @@ if Mode == "Parallel":
 		##Combining everything:
 		#*****tparalog_combiner.py
 		#first, making the directory
-		Line = "mkdir "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"\n"
+		Line = "rm -r "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"\nmkdir "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"\n"
 		OutScript.append(Line)
 		if RoundNum != NRounds:
 			#add the new sequences to the original backbone trees for the first round
 			if RoundNum == 1:
-				Line = "\n\n\n"+ScriptFolder+"tparalog_combiner.py "+GroupListFileName+" "+OGFileName+" "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ "+AlFolder+" "+AlFilePre+" "+AlFilePost+" "+ScriptFolder2+" "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ParDictFileName+" "+NCores+" "+Mode+" "+OutFolder+OutFilePre+"s_post"+str(RoundNum)+"_parcombiner.sh >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+				Line = "\n\n\n"+ScriptFolder+"tparalog_combiner.py "+GroupListFileName+" "+OGFileName+" "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ "+AlFolder+" "+AlFilePre+" "+AlFilePost+" "+ScriptFolder2+" "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ParDictFileName+" "+NCores+" "+Mode+" "+OutFolder+OutFilePre+"s_post"+str(RoundNum)+"_parcombiner.sh >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 			#and add them to the backbone trees from the previous round for every subsequent round
 			else:
-				Line = "\n\n\n"+ScriptFolder+"tparalog_combiner.py "+GroupListFileName+" "+OGFileName+" "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ "+OutFolder+OutFilePre+"_round"+str(RoundNum-1)+"/ "+OutFilePre+"rnd"+str(RoundNum-1)+"_ _allseqs_al "+ScriptFolder2+" "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ParDictFileName+" "+NCores+" "+Mode+" "+OutFolder+OutFilePre+"s_post"+str(RoundNum)+"_parcombiner.sh >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+				Line = "\n\n\n"+ScriptFolder+"tparalog_combiner.py "+GroupListFileName+" "+OGFileName+" "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ "+OutFolder+OutFilePre+"_round"+str(RoundNum-1)+"/ "+OutFilePre+"rnd"+str(RoundNum-1)+"_ _allseqs_al "+ScriptFolder2+" "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ParDictFileName+" "+NCores+" "+Mode+" "+OutFolder+OutFilePre+"s_post"+str(RoundNum)+"_parcombiner.sh >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 			OutScript.append(Line)
 			Line = "chmod u+x "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/"+OutFilePre+"rnd"+str(RoundNum)+"_Analysis_Script.sh\n"
 			Line += OutFolder+OutFilePre+"_round"+str(RoundNum)+"/"+OutFilePre+"rnd"+str(RoundNum)+"_Analysis_Script.sh\n"
@@ -270,7 +270,7 @@ if Mode == "Parallel":
 			OutScript.append(Line)
 		else:
 			#if it is the last round, we do not want to run analyze the trees, so we run tparalog_combiner.py in Parallel mode so that it will produce a script (which we don't run) instead of starting the trees directly.
-			Line = "\n\n\n"+ScriptFolder+"tparalog_combiner.py "+GroupListFileName+" "+OGFileName+" "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ "+OutFolder+OutFilePre+"_round"+str(RoundNum-1)+"/ "+OutFilePre+"rnd"+str(RoundNum-1)+"_ _allseqs_al "+ScriptFolder2+" "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ParDictFileName+" "+NCores+" Parallel >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+			Line = "\n\n\n"+ScriptFolder+"tparalog_combiner.py "+GroupListFileName+" "+OGFileName+" "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(RoundNum)+"_ "+OutFolder+OutFilePre+"_round"+str(RoundNum-1)+"/ "+OutFilePre+"rnd"+str(RoundNum-1)+"_ _allseqs_al "+ScriptFolder2+" "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/ "+OutFilePre+"rnd"+str(RoundNum)+"_ "+ParDictFileName+" "+NCores+" Parallel >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 			Line += "chmod u+x "+OutFolder+OutFilePre+"_round"+str(RoundNum)+"/"+OutFilePre+"rnd"+str(RoundNum)+"_file_moving_script.sh\n"
 			Line += OutFolder+OutFilePre+"_round"+str(RoundNum)+"/"+OutFilePre+"rnd"+str(RoundNum)+"_file_moving_script.sh\n\n\n"
 			OutScript.append(Line)
@@ -287,29 +287,29 @@ elif Mode == "Array":
 #Combining everything after the last round:
 #*******tundivcontigs_combiner.py
 #first, making the directory
-Line = "mkdir "+OutFolder+OutFilePre+"_contigsplit\n"
+Line = "rm -r "+OutFolder+OutFilePre+"_contigsplit\nmkdir "+OutFolder+OutFilePre+"_contigsplit\n"
 OutScript.append(Line)
 #This makes alignments, but I think that it does not take long enough to make it worth it to run it as an array.
-Line = ScriptFolder+"tundivcontigs_combiner.py "+GroupListFileName+" "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(NRounds)+"_ "+OutFolder+OutFilePre+"_round"+str(NRounds-1)+"/ "+OutFilePre+"rnd"+str(NRounds-1)+"_ _allseqs_al "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ "+NCores+" >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+Line = ScriptFolder+"tundivcontigs_combiner.py "+GroupListFileName+" "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(NRounds)+"_ "+OutFolder+OutFilePre+"_round"+str(NRounds-1)+"/ "+OutFilePre+"rnd"+str(NRounds-1)+"_ _allseqs_al "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ "+NCores+" >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 Line += "chmod u+x "+OutFolder+OutFilePre+"_contigsplit/"+OutFilePre+"cs_Redo_Contigs_Alignment.sh\n"
 Line += OutFolder+OutFilePre+"_contigsplit/"+OutFilePre+"cs_Redo_Contigs_Alignment.sh\n"
 OutScript.append(Line)
 #*******tcontig_selection.py
-Line = ScriptFolder+"tcontig_selection.py "+OutFolder+OutFilePre+"_contigsplit/"+OutFilePre+"cs_Contigs_to_Redo.txt "+GroupListFileName+" "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ same "+OutFilePre+"cs_ "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(NRounds)+"_ "+IndListFileName+" >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+Line = ScriptFolder+"tcontig_selection.py "+OutFolder+OutFilePre+"_contigsplit/"+OutFilePre+"cs_Contigs_to_Redo.txt "+GroupListFileName+" "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ same "+OutFilePre+"cs_ "+DataFolder+" "+DataFolder1Pre+" "+DataFolder2Pre+OutFilePre+"_sequences/ "+OutFilePre+"s"+str(NRounds)+"_ "+IndListFileName+" >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 OutScript.append(Line)
 #*******tparcomb_combiner.py
 #This still just makes alignments, so parallel is likely fast enough.
 #first, making the directory
-Line = "mkdir "+OutFolder+OutFilePre+"_combined\n"
+Line = "rm -r "+OutFolder+OutFilePre+"_combined\nmkdir "+OutFolder+OutFilePre+"_combined\n"
 OutScript.append(Line)
-Line = ScriptFolder+"tparcomb_combiner.py "+OutFolder+" "+OutFolder+OutFilePre+"_InFileList.txt "+IndListFileName+" "+OGFileName+" "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ "+OutFolder+OutFilePre+"_combined/ "+OutFilePre+"cb_ "+AlFolder+" "+AlFilePre+" "+AlFilePost+" "+ScriptFolder2+" "+ParDictFileName+" "+NCores+" >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+Line = ScriptFolder+"tparcomb_combiner.py "+OutFolder+" "+OutFolder+OutFilePre+"_InFileList.txt "+IndListFileName+" "+OGFileName+" "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ "+OutFolder+OutFilePre+"_combined/ "+OutFilePre+"cb_ "+AlFolder+" "+AlFilePre+" "+AlFilePost+" "+ScriptFolder2+" "+ParDictFileName+" "+NCores+" >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 Line += "chmod u+x "+OutFolder+OutFilePre+"_combined/"+OutFilePre+"cb_Locus_Analysis_Script.sh\n"
 Line += OutFolder+OutFilePre+"_combined/"+OutFilePre+"cb_Locus_Analysis_Script.sh\n"
 Line += "\n\n"
 OutScript.append(Line)
 #*******tparcomb_final.py
-Line = "mkdir "+OutFolder+OutFilePre+"_final\n"
-Line += ScriptFolder+"tparcomb_final.py "+OutFolder+OutFilePre+"_combined/ "+OutFilePre+"cb_ "+OutFolder+OutFilePre+"_final/ "+OutFilePre+"fi_ "+ScriptFolder2+" "+AlFolder+" "+AlFilePre+" "+AlFilePost+" "+OGFileName+" "+IndListFileName+" "+NCores+" "+Mode+" >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+Line = "rm -r "+OutFolder+OutFilePre+"_final\nmkdir "+OutFolder+OutFilePre+"_final\n"
+Line += ScriptFolder+"tparcomb_final.py "+OutFolder+OutFilePre+"_combined/ "+OutFilePre+"cb_ "+OutFolder+OutFilePre+"_final/ "+OutFilePre+"fi_ "+ScriptFolder2+" "+AlFolder+" "+AlFilePre+" "+AlFilePost+" "+OGFileName+" "+IndListFileName+" "+NCores+" "+Mode+" >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 OutScript.append(Line)
 if Mode == "Parallel":
 	Line = "chmod u+x "+OutFolder+OutFilePre+"_final/"+OutFilePre+"fi_Locus_Analysis_Script.sh\n"
@@ -324,10 +324,10 @@ elif Mode == "Array":
 #making the script to reclassify the ambiguous paralogs, if necessary
 OutScript2 = [ ]
 Line = "#! /bin/bash\n#SBATCH -J "+OutFilePre+"\n#SBATCH -t 4:00:00\n#SBATCH -n "+NCores+"\n#SBATCH --mem="+str(int(NCores)*4)+"G\n"
-Line += "date >> "+OutFolder+Date+"_"+OutFilePre+".log\nmodule load mafft\nmodule load raxml\n"
+Line += "date >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\nmodule load mafft\nmodule load raxml\n"
 OutScript2.append(Line)
-Line = "mkdir "+OutFolder+OutFilePre+"_final2\n"
-Line = ScriptFolder+"tambig_seq_renaming.py "+OutFolder+OutFilePre+"_final/ "+OutFilePre+"fi_ "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ "+OutFolder+OutFilePre+"_combined/ "+OutFilePre+"cb_ "+OutFolder+OutFilePre+"_final2/ "+OutFilePre+"fi2_ "+ScriptFolder2+" "+OGFileName+" "+IndListFileName+" "+NCores+" "+OutFolder+OutFilePre+"_combined/"+OutFilePre+"cb_Ambig_Paralog_List.txt >> "+OutFolder+Date+"_"+OutFilePre+".log\n"
+Line = "rm -r "+OutFolder+OutFilePre+"_final2\nmkdir "+OutFolder+OutFilePre+"_final2\n"
+Line = ScriptFolder+"tambig_seq_renaming.py "+OutFolder+OutFilePre+"_final/ "+OutFilePre+"fi_ "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ "+OutFolder+OutFilePre+"_combined/ "+OutFilePre+"cb_ "+OutFolder+OutFilePre+"_final2/ "+OutFilePre+"fi2_ "+ScriptFolder2+" "+OGFileName+" "+IndListFileName+" "+NCores+" "+OutFolder+OutFilePre+"_combined/"+OutFilePre+"cb_Ambig_Paralog_List.txt >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
 Line += "chmod u+x "+OutFolder+OutFilePre+"_final2/"+OutFilePre+"fi2_seq_renaming_script1.sh\n"
 Line += OutFolder+OutFilePre+"_final2/"+OutFilePre+"fi2_seq_renaming_script1.sh\n"
 OutScript2.append(Line)

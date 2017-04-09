@@ -372,20 +372,16 @@ def MRScriptWriter(SeqFileDict, Folder, Prefix, AFolder, APre, APost, Path):
 		OutList = [ ]
 		OutLocusList = [ ]
 		if LocusGroup != "Ambig":
-			Line = "#! /bin/bash\n"
-			OutList.append(Line)
-			OutList2 = [ ]
 			for Locus in SeqFileDict[LocusGroup]:
 				NamePart = SeqFileDict[LocusGroup][Locus]
-				Line = "rm "+Folder+NamePart+"_exons_al.fa && "
-				Line += "rm "+Folder+"RAxML*"+NamePart+"\n"
-				OutList.append(Line)
+				#Line = "rm "+Folder+NamePart+"_exons_al.fa && "
+				#Line += "rm "+Folder+"RAxML*"+NamePart+"\n"
+				#OutList.append(Line)
 				Line = "mafft --addfragments "+Folder+NamePart+".fa --quiet --thread -1 "+AFolder+APre+Locus+APost+".fa > "+Folder+NamePart+"_exons_al.fa && "
 				Line += Path+"fasta_to_phylip.py "+Folder+NamePart+"_exons_al.fa && "
 				Line += "raxmlHPC -f v -s "+Folder+NamePart+"_exons_al.phy -n "+NamePart+" -t "+AFolder+"RAxML_bipartitions."+APre+Locus+" -m GTRCAT -o "+OGDict[Locus]+" -w "+Folder+"\n"
-				OutList2.append(Line)
+				OutList.append(Line)
 				OutLocusList.append(Locus+"\n")
-			OutList += OutList2
 			OutFileName = Folder+Prefix+LocusGroup+"Analysis_Script.sh"
 			OutFileWriting(OutFileName, OutList)
 			print("The shell script for analyzing this %s group of sequences data was written to %s.\n" % (LocusGroup, OutFileName))
