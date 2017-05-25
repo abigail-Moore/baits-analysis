@@ -19,6 +19,7 @@ spades
 blast
 parallel
 minimo
+ssake
 
 in Array mode:
 Slurm

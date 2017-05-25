@@ -19,7 +19,6 @@
 #double sequences for some loci.
 #version 1.2 23 Feb. 2016
 #modified so that the alignments are processed in order from largest to smallest
-#***************this has not been tested*****************
 
 #format of Ambigs_per_Seq.txt (has a header line, starting with "Locus" that identifies the groups)
 '''

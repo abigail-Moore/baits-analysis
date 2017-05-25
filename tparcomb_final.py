@@ -332,46 +332,47 @@ for Locus in RedoList:
 					if len(SplitSeqName) > 2:
 						if (SplitSeqName[0]+"."+SplitSeqName[1]) == NameTemp:
 							IndSeqList.append(SeqName)
-				(ConSeq, NumAmbig, AmbigSitesList, NumSeqs, Overlap) = ConSeqMaker(LocusSeqDict,IndSeqList)
-				#keep the sequence, if there are few enough ambiguities
-				if NumAmbig < 5:
-					#First, add everything about that sequence to the dictionary
-					NewSeqDict[Locus][Paralog][Ind]['Fate'] = 'combine'
-					NewSeqDict[Locus][Paralog][Ind]['Seq'] = ConSeq
-					NumSeqs = 0
-					NumAmbigs = NumAmbig
-					for SeqName in IndSeqList:
-						SeqNameSplit = SeqName.split(".")
-						NumSeqs += int(SeqNameSplit[2][:-4])
-						NumAmbigs += int(SeqNameSplit[3][:-5])
-					NewSeqName = ".".join([Ind, Paralog, str(NumSeqs)+"seqs", str(NumAmbigs)+"ambig", "len"+str(len(ConSeq))])
-					NewSeqDict[Locus][Paralog][Ind]['SeqName'] = NewSeqName
-					NewSeqDict[Locus][Paralog][Ind]['SeqLen'] = len(ConSeq)
-					NewSeqDict[Locus][Paralog][Ind]['NumAmbigs'] = NumAmbigs
-					NewSeqDict[Locus][Paralog][Ind]['NumSeqs'] = NumSeqs
-					NewSeqDict[Locus][Paralog][Ind]['Overlap'] = Overlap
-					NewSeqDict[Locus][Paralog][Ind]['OldSeqs'] = IndSeqList
-					#Then, remove both of the old sequences from the alignments
-					for SeqName in IndSeqList:
-						del LocusSeqDict[SeqName]
-						del ParalogSeqDict[SeqName]
-						del AllCombSeqDict[SeqName]
-						try:
-							del BestSeqDict[SeqName]
-							del BestCombSeqDict[SeqName]
-						except KeyError:
-							"do nothing"
-					#And add the new sequences to the dictionaries of unaligned sequences
-					AllCombSeqDict[NewSeqName] = ConSeq
-					BestCombSeqDict[NewSeqName] = ConSeq
-					NewLocusSeqs[NewSeqName] = ConSeq
-					#and the paralog dictionary
-					ParalogSeqDict[NewSeqName] = ConSeq
-					RedoneDict[Locus].append(ParalogName)
-				else:
-					"do nothing"
-					NewSeqDict[Locus][Paralog][Ind]['Fate'] = 'separate'
-				#If there are too many ambiguities, then I guess we just keep the sequences separate, because they are probably different.
+				if IndSeqList != [ ]:
+					(ConSeq, NumAmbig, AmbigSitesList, NumSeqs, Overlap) = ConSeqMaker(LocusSeqDict,IndSeqList)
+					#keep the sequence, if there are few enough ambiguities
+					if NumAmbig < 5:
+						#First, add everything about that sequence to the dictionary
+						NewSeqDict[Locus][Paralog][Ind]['Fate'] = 'combine'
+						NewSeqDict[Locus][Paralog][Ind]['Seq'] = ConSeq
+						NumSeqs = 0
+						NumAmbigs = NumAmbig
+						for SeqName in IndSeqList:
+							SeqNameSplit = SeqName.split(".")
+							NumSeqs += int(SeqNameSplit[2][:-4])
+							NumAmbigs += int(SeqNameSplit[3][:-5])
+						NewSeqName = ".".join([Ind, Paralog, str(NumSeqs)+"seqs", str(NumAmbigs)+"ambig", "len"+str(len(ConSeq))])
+						NewSeqDict[Locus][Paralog][Ind]['SeqName'] = NewSeqName
+						NewSeqDict[Locus][Paralog][Ind]['SeqLen'] = len(ConSeq)
+						NewSeqDict[Locus][Paralog][Ind]['NumAmbigs'] = NumAmbigs
+						NewSeqDict[Locus][Paralog][Ind]['NumSeqs'] = NumSeqs
+						NewSeqDict[Locus][Paralog][Ind]['Overlap'] = Overlap
+						NewSeqDict[Locus][Paralog][Ind]['OldSeqs'] = IndSeqList
+						#Then, remove both of the old sequences from the alignments
+						for SeqName in IndSeqList:
+							del LocusSeqDict[SeqName]
+							del ParalogSeqDict[SeqName]
+							del AllCombSeqDict[SeqName]
+							try:
+								del BestSeqDict[SeqName]
+								del BestCombSeqDict[SeqName]
+							except KeyError:
+								"do nothing"
+						#And add the new sequences to the dictionaries of unaligned sequences
+						AllCombSeqDict[NewSeqName] = ConSeq
+						BestCombSeqDict[NewSeqName] = ConSeq
+						NewLocusSeqs[NewSeqName] = ConSeq
+						#and the paralog dictionary
+						ParalogSeqDict[NewSeqName] = ConSeq
+						RedoneDict[Locus].append(ParalogName)
+					else:
+						"do nothing"
+						NewSeqDict[Locus][Paralog][Ind]['Fate'] = 'separate'
+					#If there are too many ambiguities, then I guess we just keep the sequences separate, because they are probably different.
 		#write the new paralog file (the old file with the duplicate sequences removed and the new paralog sequences added)
 		SeqFileWriting(OutFolder+OutFilePre+Locus+"_"+ParalogName+".fa", ParalogSeqDict, "fasta")
 	#write the new locus files

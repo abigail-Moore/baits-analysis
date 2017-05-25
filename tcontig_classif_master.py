@@ -12,21 +12,19 @@ tbaits_intron_removal.py
 tseq_placer_dup.py
 tcontigs_to_fixed_paralogs.py
 tparalog_combiner.py
-(tbaits_cleanup.py)--not added yet
 tundivcontigs_combiner.py
 tcontig_selection.py
 tparcomb_combiner.py
 tparcomb_final.py
-tambig_seq_renaming.py
 
 indirectly:
 fastq_to_phylip.py
-treerenamer.py
 mafft
 raxml
 
 in Array mode:
 Slurm
+tccm_group_array_subscript.py
 '''
 
 import sys
@@ -320,21 +318,3 @@ if Mode == "Parallel":
 elif Mode == "Array":
 	OutFileName = OutFolder+OutFilePre+"_contig_classification_script2.sh"
 	OutFileWriting(OutFileName, OutScript)
-
-#making the script to reclassify the ambiguous paralogs, if necessary
-OutScript2 = [ ]
-Line = "#! /bin/bash\n#SBATCH -J "+OutFilePre+"\n#SBATCH -t 4:00:00\n#SBATCH -n "+NCores+"\n#SBATCH --mem="+str(int(NCores)*4)+"G\n"
-Line += "date >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\nmodule load mafft\nmodule load raxml\n"
-OutScript2.append(Line)
-Line = "rm -r "+OutFolder+OutFilePre+"_final2\nmkdir "+OutFolder+OutFilePre+"_final2\n"
-Line = ScriptFolder+"tambig_seq_renaming.py "+OutFolder+OutFilePre+"_final/ "+OutFilePre+"fi_ "+OutFolder+OutFilePre+"_contigsplit/ "+OutFilePre+"cs_ "+OutFolder+OutFilePre+"_combined/ "+OutFilePre+"cb_ "+OutFolder+OutFilePre+"_final2/ "+OutFilePre+"fi2_ "+ScriptFolder2+" "+OGFileName+" "+IndListFileName+" "+NCores+" "+OutFolder+OutFilePre+"_combined/"+OutFilePre+"cb_Ambig_Paralog_List.txt >> "+OutFolder+Date+"_"+OutFilePre+"contig_classif.log\n"
-Line += "chmod u+x "+OutFolder+OutFilePre+"_final2/"+OutFilePre+"fi2_seq_renaming_script1.sh\n"
-Line += OutFolder+OutFilePre+"_final2/"+OutFilePre+"fi2_seq_renaming_script1.sh\n"
-OutScript2.append(Line)
-OutFileName2 = OutFolder+OutFilePre+"_Ambiguous_Sequence_Renaming.sh"
-OutFileWriting(OutFileName2, OutScript2)
-print("Once %s has run, look at the trees to determine whether any 'Ambig' sequences can really be classified into one of the paralogs." % (OutFileName))
-print("If they can be, modify the file %s by adding [tab] actual paralog to each line, save it with the same file name, and run the script %s.\n" % (OutFolder+OutFilePre+"_combined/"+OutFilePre+"cb_Ambig_Paralog_List.txt", OutFileName2))
-sys.stderr.write("Once %s has run, look at the trees to determine whether any 'Ambig' sequences can really be classified into one of the paralogs." % (OutFileName))
-sys.stderr.write("If they can be, modify the file %s by adding [tab] actual paralog to each line, save it with the same file name, and run the script %s.\n" % (OutFolder+OutFilePre+"_combined/"+OutFilePre+"cb_Ambig_Paralog_List.txt", OutFileName2))
-

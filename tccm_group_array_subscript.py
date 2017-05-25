@@ -76,11 +76,7 @@ AlFolder = sys.argv[13]
 if AlFolder[-1] != "/":
 	AlFolder += "/"
 AlFilePre = sys.argv[14]
-if AlFilePre == "none":
-	AlFilePre = ""
 AlFilePost = sys.argv[15]
-if AlFilePost == "none":
-	AlFilePost = ""
 NRounds = int(sys.argv[16])
 RoundNum = int(sys.argv[17])
 
