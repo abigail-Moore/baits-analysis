@@ -54,8 +54,8 @@ classification.
 [the file name for the list of groups with polyploids]
 [the file name for the file telling which individuals belong to which groups]
 [the folder for the backbone alignments and trees]
-[the prefix for the backbone alignments and trees]
-[the suffix for the backbone alignments]
+[the prefix for the backbone alignments and trees, or none, if none]
+[the suffix for the backbone alignments, or none, if none]
 [number of cores for Oscar]
 [number of rounds the analysis should be run]
 [mode: either Parallel (for desktops or clusters) or Array (for Slurm)]
@@ -101,11 +101,7 @@ AlFolder = sys.argv[16]
 if AlFolder[-1] != "/":
 	AlFolder += "/"
 AlFilePre = sys.argv[17]
-if AlFilePre == "none":
-	AlFilePre = ""
 AlFilePost = sys.argv[18]
-if AlFilePost == "none":
-	AlFilePost = ""
 NCores = sys.argv[19]
 NRounds = int(sys.argv[20])
 Mode = sys.argv[21]
@@ -315,6 +311,8 @@ if Mode == "Parallel":
 	OutScript.append(Line)
 	OutFileName = OutFolder+OutFilePre+"_contig_classification_script.sh"
 	OutFileWriting(OutFileName, OutScript)
+	print("The script you need to run is %s.\n" % (OutFileName))
+	sys.stderr.write("The script you need to run is %s.\n" % (OutFileName))
 elif Mode == "Array":
 	OutFileName = OutFolder+OutFilePre+"_contig_classification_script2.sh"
 	OutFileWriting(OutFileName, OutScript)

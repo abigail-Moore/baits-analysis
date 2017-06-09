@@ -277,6 +277,8 @@ if Mode == 'Parallel':
 		Line = "raxmlHPC -f a -s "+OutFolder+OutFilePre+Locus+OutFilePost+"_al.phy -n "+OutFilePre+Locus+OutFilePost+" -m GTRCAT -p 1234 -N 100 -x 1234 -o "+OutGroupDict[Locus]+" -w "+OutFolder+" && "
 		#version for laptop
 		#Line += "java -jar ~/bin/Notung-2.8.1.6-beta.jar -g "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+OutFilePost+" -s "+SpeciesTreeFN+" --speciestag prefix --rearrange --threshold 90 --nolosses --silent  --usegenedir\n"
+		#version for desktop
+		#Line += "java -jar ~/bin/Notung-2.9.jar -g "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+OutFilePost+" -s "+SpeciesTreeFN+" --speciestag prefix --rearrange --threshold 90 --nolosses --silent  --usegenedir\n"
 		#version for oscar
 		Line += "java -jar "+ScriptPath+"Notung-2.8.1.6-beta.jar -g "+OutFolder+"RAxML_bipartitions."+OutFilePre+Locus+OutFilePost+" -s "+SpeciesTreeFN+" --speciestag prefix --rearrange --threshold 90 --nolosses --silent  --usegenedir\n"
 		OutList3.append(Line)

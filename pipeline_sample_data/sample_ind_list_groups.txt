@@ -1,0 +1,9 @@
+Anacampserotaceae	Anacampseros_arachnoides_101
+Anacampserotaceae	Anacampseros_baeseckei_91
+Anacampserotaceae	Anacampseros_coahuilensis_68
+Basellaceae	Anredera_baselloides_38
+Basellaceae	Anredera_diffusa_211
+Basellaceae	Basella_alba_61
+Cactaceae	Pereskia_grandifolia_59
+Cactaceae	Pereskia_lychnidiflora_78
+Cactaceae	Rhipsalis_capilliformis_54

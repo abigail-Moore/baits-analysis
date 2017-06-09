@@ -1,0 +1,3 @@
+alaAT	BT115611.Picea.glauca
+ppc1	Beta_vulgaris_cds.ppc-1E2.Bv4_084890_ihek.t1
+tdt	Sb02g028210.1

@@ -786,10 +786,13 @@ for Locus in LocusList:
 	TreeFileName = InFolder+"RAxML_bipartitions."+InFilePre+Locus+InFilePost+".rearrange.0.ntg"
 	LocusTree_orig = NotungFileReading(TreeFileName)
 	if LocusTree_orig == "nothing":
-		print("No tree file for locus %s.\n" % (Locus))
-		sys.stderr.write("No tree file for locus %s.\n" % (Locus))
-		LociUnRead += 1
-	else:
+		TreeFileName = InFolder+"RAxML_bipartitions."+InFilePre+Locus+InFilePost+".rearrange.0"
+		LocusTree_orig = NotungFileReading(TreeFileName)
+		if LocusTree_orig == "nothing":
+			print("No tree file for locus %s.\n" % (Locus))
+			sys.stderr.write("No tree file for locus %s.\n" % (Locus))
+			LociUnRead += 1
+	if LocusTree_orig != "nothing":
 		LociRead += 1
 		#setting up the dictionaries
 		SeqsPerIndGF[Locus] = defaultdict(int)

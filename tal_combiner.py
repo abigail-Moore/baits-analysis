@@ -654,10 +654,10 @@ elif OutMode == 'separate':
 		OutFileName2 = OutFolder+OutFilePre+"analysis_script_raxml2.sh"
 		Line = "cat "+OutFileName2+" | parallel --joblog "+OutFolder+OutFilePre+"separate_trees.log\n"
 		OutList1.append(Line)
-		Line = "mkdir "+OutFolder+OutFilePre+"_raxmlbs\ncp "+OutFolder+"RAxML_bootstrap."+OutFilePre+"* "+OutFolder+OutFilePre+"_raxmlbs\n"
-		Line += "cd "+OutFolder+OutFilePre+"_raxmlbs\nls RAxML_bootstrap.* > bootstrap_filelist.txt\n"
-		Line += "cat "+OutFolder+OutFilePre+"RAxML_bestTree."+OutFilePre+"* > "+OutFolder+OutFilePre+"_raxmlbs/"+OutFilePre+"bestTrees.tre\n"
-		Line += "tar -cf "+OutFolder+OutFilePre+"_raxmlbs.tar "+OutFolder+OutFilePre+"_raxmlbs\ngzip "+OutFolder+OutFilePre+"_raxmlbs.tar.gz\n"
+		Line = "mkdir "+OutFolder+OutFilePre+"raxmlbs\ncp "+OutFolder+"RAxML_bootstrap."+OutFilePre+"* "+OutFolder+OutFilePre+"raxmlbs\n"
+		Line += "cd "+OutFolder+OutFilePre+"raxmlbs\nls RAxML_bootstrap.* > bootstrap_filelist.txt\n"
+		Line += "cat "+OutFolder+"RAxML_bestTree."+OutFilePre+"* > "+OutFolder+OutFilePre+"raxmlbs/"+OutFilePre+"bestTrees.tre\n"
+		Line += "tar -cf "+OutFolder+OutFilePre+"raxmlbs.tar "+OutFolder+OutFilePre+"raxmlbs\ngzip "+OutFolder+OutFilePre+"raxmlbs.tar.gz\n"
 		OutList1.append(Line)
 		OutFileWriting(OutFileName1, OutList1)
 		OutFileWriting(OutFileName2, OutList2)

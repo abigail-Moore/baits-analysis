@@ -1,0 +1,12 @@
+alaAT	alaAT
+ppc1	ppc1
+ppc1-1E1b	ppc1
+ppc-1E1a	ppc1
+ppc-1E1a_prime	ppc1
+ppc-1E1a'	ppc1
+ppc-1E1c	ppc1
+ppc-1E1d	ppc1
+ppc-1E1e	ppc1
+ppc-1E2	ppc1
+Pepc1GB	ppc1
+tdt	tdt

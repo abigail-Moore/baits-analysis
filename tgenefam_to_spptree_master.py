@@ -179,10 +179,10 @@ OutScript.append(Line)
 #1) if we don't have a good species tree and we want to run this automatically, we can make the concatenated tree and go on with that.
 if TreeMode == "New":
 	###########tal_combiner.py
-	Line = ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_Loci_above_25_group.txt "+ScriptFolder+" "+InOutFolder+InOutFilePre+"_genetrees1/ "+InOutFilePre+"gt1_ "+AlFileOutPost+"_al.fa fasta fasta "+OGName+" "+InOutFolder+InOutFilePre+"_prunedgenetrees1 "+InOutFilePre+"pgt1_ combinednobs 10000 10000 all 2 Parallel >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
+	Line = ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_Loci_above_25_group.txt "+ScriptFolder2+" "+InOutFolder+InOutFilePre+"_genetrees1/ "+InOutFilePre+"gt1_ "+AlFileOutPost+"_al.fa fasta fasta "+OGName+" "+InOutFolder+InOutFilePre+"_prunedgenetrees1 "+InOutFilePre+"pgt1_ combinednobs 10000 10000 all 2 Parallel >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
 	Line += "chmod u+x "+InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgt1_analysis_script.sh\n"
 	Line += InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgt1_analysis_script.sh\n"
-	Line += "cp "+InOutFolder+InOutFilePre+"_prunedgenetrees1/RAxML_bipartitions."+InOutFilePre+"pgt1_combined* "+InOutFolder+InOutFilePre+"pgt1_spptree.tre\n"
+	Line += "cp "+InOutFolder+InOutFilePre+"_prunedgenetrees1/RAxML_bestTree."+InOutFilePre+"pgt1_combined* "+InOutFolder+InOutFilePre+"pgt1_spptree.tre\n"
 	OutScript.append(Line)
 	#Then we need to go on to rerun tnotung_homolog_parsing.py, tparalog_selector.py, and tal_combiner.py again, but that overlaps with option #2, so this will be below.
 #2) if we don't have a good species tree and we want to make one with astral or some other script oscar doesn't have, we can stop the script after the gene trees for astral have been made
@@ -204,7 +204,7 @@ elif TreeMode == "Pause":
 #3) if we do have a good species tree, then we don't need to restart the script after making one.
 elif TreeMode == "Good":
 	###########tal_combiner.py
-	Line = ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_Loci_above_25_group.txt "+ScriptFolder+" "+InOutFolder+InOutFilePre+"_genetrees1/ "+InOutFilePre+"gt1_ "+AlFileOutPost+"_al.fa fasta fasta tree "+InOutFolder+InOutFilePre+"_prunedgenetrees1 "+InOutFilePre+"pgt1_ separate 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_non_lower_outliers.txt 2 "+Mode+" "+SpTrFileName+" >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
+	Line = ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_Loci_above_25_group.txt "+ScriptFolder2+" "+InOutFolder+InOutFilePre+"_genetrees1/ "+InOutFilePre+"gt1_ "+AlFileOutPost+"_al.fa fasta fasta tree "+InOutFolder+InOutFilePre+"_prunedgenetrees1 "+InOutFilePre+"pgt1_ separate 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_non_lower_outliers.txt 2 "+Mode+" "+SpTrFileName+" >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
 	OutScript.append(Line)
 	Line += "chmod u+x "+InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgt1_analysis_script.sh\n"
 	Line += InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgt1_analysis_script.sh\n"
@@ -216,7 +216,10 @@ if (TreeMode == "New") or (TreeMode == "Pause"):
 	#first I need to rerun Notung.  :(
 	Line = "mkdir "+InOutFolder+InOutFilePre+"_genefams2\n"
 	Line += "cp "+InOutFolder+InOutFilePre+"_genefams1/RAxML_bipartitions."+InOutFilePre+"gf1_*"+AlFileOutPost+" "+InOutFolder+InOutFilePre+"_genefams2/\n"
-	Line += "ls "+InOutFolder+InOutFilePre+"_genefams2/RAxML_bipartitions."+InOutFilePre+"gf1_*"+AlFileOutPost+" | parallel java -jar "+ScriptFolder+"Notung-2.8.1.6-beta.jar -g {} -s "+InOutFolder+InOutFilePre+"pgt1_spptree.tre --speciestag prefix --rearrange --threshold 90 --nolosses --silent  --usegenedir\n"
+	#version for desktop
+	#Line += "ls "+InOutFolder+InOutFilePre+"_genefams2/RAxML_bipartitions."+InOutFilePre+"gf1_*"+AlFileOutPost+" | parallel java -jar ~/bin/Notung-2.9.jar -g {} -s "+InOutFolder+InOutFilePre+"pgt1_spptree.tre --speciestag prefix --rearrange --threshold 90 --nolosses --silent  --usegenedir\n"
+	#version for cluster
+	Line += "ls "+InOutFolder+InOutFilePre+"_genefams2/RAxML_bipartitions."+InOutFilePre+"gf1_*"+AlFileOutPost+" | parallel java -jar "+ScriptFolder2+"Notung-2.8.1.6-beta.jar -g {} -s "+InOutFolder+InOutFilePre+"pgt1_spptree.tre --speciestag prefix --rearrange --threshold 90 --nolosses --silent  --usegenedir\n"
 	OutScript.append(Line)
 	###########tnotung_homolog_parsing.py
 	Line = "mkdir "+InOutFolder+InOutFilePre+"_genetrees2\n"
@@ -231,12 +234,12 @@ if (TreeMode == "New") or (TreeMode == "Pause"):
 	OutScript.append(Line)
 	###########tal_combiner.py
 	Line = "mkdir "+InOutFolder+InOutFilePre+"_prunedgenetrees2\n"
-	Line += ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_Loci_above_25_group.txt "+ScriptFolder+" "+InOutFolder+InOutFilePre+"_genetrees2/ "+InOutFilePre+"gt2_ "+AlFileOutPost+"_al.fa fasta fasta tree "+InOutFolder+InOutFilePre+"_prunedgenetrees2 "+InOutFilePre+"pgts2_ separate 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_non_lower_outliers.txt .1 "+Mode+" "+InOutFolder+InOutFilePre+"pgt1_spptree.tre >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
-	Line += ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_Loci_above_25_group.txt "+ScriptFolder+" "+InOutFolder+InOutFilePre+"_genetrees2/ "+InOutFilePre+"gt2_ "+AlFileOutPost+"_al.fa fasta fasta "+OGName+" "+InOutFolder+InOutFilePre+"_prunedgenetrees2 "+InOutFilePre+"pgtc2_ combined 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_non_lower_outliers.txt .1 "+Mode+" >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
+	Line += ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_Loci_above_25_group.txt "+ScriptFolder2+" "+InOutFolder+InOutFilePre+"_genetrees2/ "+InOutFilePre+"gt2_ "+AlFileOutPost+"_al.fa fasta fasta tree "+InOutFolder+InOutFilePre+"_prunedgenetrees2 "+InOutFilePre+"pgts2_ separate 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_non_lower_outliers.txt .1 "+Mode+" "+InOutFolder+InOutFilePre+"pgt1_spptree.tre >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
+	Line += ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_Loci_above_25_group.txt "+ScriptFolder2+" "+InOutFolder+InOutFilePre+"_genetrees2/ "+InOutFilePre+"gt2_ "+AlFileOutPost+"_al.fa fasta fasta "+OGName+" "+InOutFolder+InOutFilePre+"_prunedgenetrees2 "+InOutFilePre+"pgtc2_ combined 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_non_lower_outliers.txt .1 "+Mode+" >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
 	OutScript.append(Line)
 	if Mode == "Parallel":
-		Line = "chmod u+x "+InOutFolder+InOutFilePre+"_prunedgenetrees2/"+InOutFilePre+"pgts2_analysis_script.sh\n"
-		Line += InOutFolder+InOutFilePre+"_prunedgenetrees2/"+InOutFilePre+"pgts2_analysis_script.sh\n"
+		Line = "chmod u+x "+InOutFolder+InOutFilePre+"_prunedgenetrees2/"+InOutFilePre+"pgts2_analysis_script_raxml1.sh\n"
+		Line += InOutFolder+InOutFilePre+"_prunedgenetrees2/"+InOutFilePre+"pgts2_analysis_script_raxml1.sh\n"
 		Line += "chmod u+x "+InOutFolder+InOutFilePre+"_prunedgenetrees2/"+InOutFilePre+"pgtc2_analysis_script.sh\n"
 		Line += InOutFolder+InOutFilePre+"_prunedgenetrees2/"+InOutFilePre+"pgtc2_analysis_script.sh\n"
 		OutScript.append(Line)

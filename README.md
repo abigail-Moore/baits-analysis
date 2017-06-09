@@ -24,6 +24,7 @@ sys
 
 Other required programs include:
 blast
+gnu-parallel
 mafft
 notung
 raxml
