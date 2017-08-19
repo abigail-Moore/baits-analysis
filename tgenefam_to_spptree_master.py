@@ -172,10 +172,12 @@ Line = "date >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
 Line += ScriptFolder+"tparalog_selector.py "+InOutFolder+InOutFilePre+"_genetrees1/ "+InOutFilePre+"gt1_ same "+InOutFilePre+"gt1_ >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
 OutScript.append(Line)
 
+#We now need to remove the old prunedgenetrees1 if it exists so those trees don't get included in the Astral tree.
+Line = "rm -r "+InOutFolder+InOutFilePre+"_prunedgenetrees1\n"
+Line += "mkdir "+InOutFolder+InOutFilePre+"_prunedgenetrees1\n"
+OutScript.append(Line)
 
 #at this point, one of three things can happen:
-Line = "mkdir "+InOutFolder+InOutFilePre+"_prunedgenetrees1\n"
-OutScript.append(Line)
 #1) if we don't have a good species tree and we want to run this automatically, we can make the concatenated tree and go on with that.
 if TreeMode == "New":
 	###########tal_combiner.py
@@ -205,10 +207,14 @@ elif TreeMode == "Pause":
 elif TreeMode == "Good":
 	###########tal_combiner.py
 	Line = ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_Loci_above_25_group.txt "+ScriptFolder2+" "+InOutFolder+InOutFilePre+"_genetrees1/ "+InOutFilePre+"gt1_ "+AlFileOutPost+"_al.fa fasta fasta tree "+InOutFolder+InOutFilePre+"_prunedgenetrees1 "+InOutFilePre+"pgt1_ separate 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_non_lower_outliers.txt 2 "+Mode+" "+SpTrFileName+" >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
+	Line += ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_Loci_above_25_group.txt "+ScriptFolder2+" "+InOutFolder+InOutFilePre+"_genetrees1/ "+InOutFilePre+"gt1_ "+AlFileOutPost+"_al.fa fasta fasta "+OGName+" "+InOutFolder+InOutFilePre+"_prunedgenetrees1 "+InOutFilePre+"pgtc1_ combined 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees1/"+InOutFilePre+"gt1_non_lower_outliers.txt .1 "+Mode+" >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
 	OutScript.append(Line)
-	Line += "chmod u+x "+InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgt1_analysis_script.sh\n"
-	Line += InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgt1_analysis_script.sh\n"
-	OutScript.append(Line)
+	if Mode == "Parallel":
+		Line = "chmod u+x "+InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgt1_analysis_script.sh\n"
+		Line += InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgt1_analysis_script.sh\n"
+		Line += "chmod u+x "+InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgtc1_analysis_script.sh\n"
+		Line += InOutFolder+InOutFilePre+"_prunedgenetrees1/"+InOutFilePre+"pgtc1_analysis_script.sh\n"
+		OutScript.append(Line)
 	OutFileWriting(OutFileName, OutScript)
 
 ###########make concatenated tree or pause for species tree to be input
@@ -233,7 +239,9 @@ if (TreeMode == "New") or (TreeMode == "Pause"):
 	Line += ScriptFolder+"tparalog_selector.py "+InOutFolder+InOutFilePre+"_genetrees2/ "+InOutFilePre+"gt2_ same "+InOutFilePre+"gt2_ >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
 	OutScript.append(Line)
 	###########tal_combiner.py
-	Line = "mkdir "+InOutFolder+InOutFilePre+"_prunedgenetrees2\n"
+	#If there is an old prunedgenetrees2, this needs to be removed, to avoid including trees from the previous round in the Astral tree.
+	Line = "rm -r "+InOutFolder+InOutFilePre+"_prunedgenetrees2\n"
+	Line += "mkdir "+InOutFolder+InOutFilePre+"_prunedgenetrees2\n"
 	Line += ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_Loci_above_25_group.txt "+ScriptFolder2+" "+InOutFolder+InOutFilePre+"_genetrees2/ "+InOutFilePre+"gt2_ "+AlFileOutPost+"_al.fa fasta fasta tree "+InOutFolder+InOutFilePre+"_prunedgenetrees2 "+InOutFilePre+"pgts2_ separate 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_non_lower_outliers.txt .1 "+Mode+" "+InOutFolder+InOutFilePre+"pgt1_spptree.tre >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
 	Line += ScriptFolder+"tal_combiner.py "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_Loci_above_25_group.txt "+ScriptFolder2+" "+InOutFolder+InOutFilePre+"_genetrees2/ "+InOutFilePre+"gt2_ "+AlFileOutPost+"_al.fa fasta fasta "+OGName+" "+InOutFolder+InOutFilePre+"_prunedgenetrees2 "+InOutFilePre+"pgtc2_ combined 10000 10000 "+InOutFolder+InOutFilePre+"_genetrees2/"+InOutFilePre+"gt2_non_lower_outliers.txt .1 "+Mode+" >> "+InOutFolder+Date+"_"+InOutFilePre+".log\n"
 	OutScript.append(Line)

@@ -275,6 +275,7 @@ def SeqCombiner(TempTree, InSeqDict):
 	if Vociferous == True: print("Resolving duplications that have sequences that should have been combined into one sequence.\n")
 	NumDupsOld = 0
 	NumDupsNew = 0
+	DictTemp = defaultdict(dict)
 	for Node in TempTree.postorder_node_iter():
 		if Node.label[0] == "Y":
 			NumDupsOld += 1
@@ -321,6 +322,7 @@ def SeqCombiner(TempTree, InSeqDict):
 								NumSeqsTot += int(SeqName.split("seqs")[0].split(".")[-1])-1
 								NumAmbigsTot += int(SeqName.split("ambig")[0].split(".")[-1])
 						NewSeqName = ".".join([IndName, ParNameList[0], str(NumSeqsTot)+"seqs", str(NumAmbigsTot)+"ambig", "len"+str(SeqLenFinder(ConSeq))])
+						DictTemp[IndName][NewSeqName] = DaughterDict[IndName]
 						try:
 							SeqTemp = InSeqDict[NewSeqName]
 							NewSeqName = NewSeqName+"_b"
@@ -365,7 +367,7 @@ def SeqCombiner(TempTree, InSeqDict):
 				NumDupsNew = NumDupsNew -1
 	if ShowTrees == True: print(TempTree.as_ascii_plot(show_internal_node_labels=True))
 	if Vociferous == True: print("Prior to combining separated parts of sequences of the same paralog, there were %d duplications.  Now there are %d.\n" % (NumDupsOld, NumDupsNew))
-	return (TempTree, InSeqDict)
+	return (TempTree, InSeqDict, DictTemp)
 
 #DuplicationMapper goes through the tree and figures out the nodes above and below each duplication, for subsequent mapping\
 #original
@@ -776,6 +778,7 @@ IndsPerGroupDict = defaultdict(dict)#IndsPerGroupDict[Locus][ParName][GroupName]
 #Also dictionaries that include the duplications at the tips, for looking at polyploidy:
 DupPosDictPP = defaultdict(dict)#DupPosDictPP[Locus][DupName]['sister'/'daughters'] = list of individuals
 SeqsPerIndGFPP = defaultdict(dict)#SeqsPerIndGFPP[Locus][Ind] = NumSeqs
+CombDict = defaultdict(dict)#CombDict[Locus][IndName][NewSeqName] = ListofCombinedParalogs
 
 LocusListOut = [ ]
 LociRead = 0
@@ -803,7 +806,7 @@ for Locus in LocusList:
 		#going through each node in the tree and determining whether Notung reconstructed a duplication at that node
 		(LocusTree_new) = DuplicationFinder(LocusTree_orig, IndGroupDict)
 		#Go through the duplications and try to combine the sequences that can be combined
-		(LocusTree_pruned, NewSeqDict) = SeqCombiner(LocusTree_new, LocusAl_orig)
+		(LocusTree_pruned, NewSeqDict, CombDict[Locus]) = SeqCombiner(LocusTree_new, LocusAl_orig)
 		#choose the longer sequence for each duplication involving only one individual that could not be successfully resolved
 		(LocusTree_nodups) = IndDupsRemoving(LocusTree_pruned, LocusAl_orig)
 		#then figuring out where all the duplications are (first including duplications in the tips)
@@ -1016,6 +1019,17 @@ for Group in GroupList:
 OutList.append(NumSeqsLine+"\n")
 OutList.append(NumGroupsLine+"\n")
 OutFileWriting(OutFileName, OutList)
+
+#printing CombDict (showing which sequences were combined)
+OutFileName = OutFolder+OutFilePre+"combined_seqs.txt"
+OutList = ['Locus\tIndName\tNew_Paralog_Name\tParalogs_Combined\n']
+for Locus in sorted(CombDict.keys()):
+	for IndName in sorted(CombDict[Locus].keys()):
+		for NewSeqName in sorted(CombDict[Locus][IndName].keys()):
+			Line = Locus+"\t"+IndName+"\t"+NewSeqName+"\t"+",".join(CombDict[Locus][IndName][NewSeqName])+"\n"
+			OutList.append(Line)
+OutFileWriting(OutFileName, OutList)
+		
 
 #writing a script to re-align the sequences to prepare them to be made into species trees!
 Script1FileName = OutFolder+OutFilePre+"analysis_script1.sh"

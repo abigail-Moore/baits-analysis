@@ -267,14 +267,20 @@ def LocusAlSeqGetter(LList,Folder,FilePre,FilePost,SeqFormat):
 		FileName = Folder + FilePre + Locus + FilePost
 		try:
 			MyAlignment = AlignIO.read(FileName, SeqFormat)
+			for seq_record in MyAlignment:
+				TempDict[Locus][seq_record.id] = str(seq_record.seq)
+				#print("%d sequences for locus %s were read from the file %s.\n" % (len(TempDict[Locus].keys()), Locus, FileName))
 		#If this alignment doesn't exist, that is because the paralog only had one sequence, so mafft didn't align it.
 		except ValueError:
 			FileName = ".".join(FileName.split("_al."))
-			MyAlignment = AlignIO.read(FileName, SeqFormat)
-			if Verbose == True: print("The new FileName is %s, and it has %d sequences." % (FileName, len(MyAlignment)))
-		for seq_record in MyAlignment:
-			TempDict[Locus][seq_record.id] = str(seq_record.seq)
-		#print("%d sequences for locus %s were read from the file %s.\n" % (len(TempDict[Locus].keys()), Locus, FileName))
+			try:
+				MyAlignment = AlignIO.read(FileName, SeqFormat)
+				for seq_record in MyAlignment:
+					TempDict[Locus][seq_record.id] = str(seq_record.seq)
+					#print("%d sequences for locus %s were read from the file %s.\n" % (len(TempDict[Locus].keys()), Locus, FileName))
+				if Verbose == True: print("The new FileName is %s, and it has %d sequences." % (FileName, len(MyAlignment)))
+			except ValueError: #Then the file actually doesn't exist.
+				"do nothing"
 	print("%d sequence files were read, with names such as %s.\n" % (len(LList), FileName))
 	sys.stderr.write("%d sequence files were read, with names such as %s.\n" % (len(LList), FileName))
 	return TempDict
@@ -486,7 +492,7 @@ if (OutMode == "combined") or (OutMode == "combinednobs"):
 	if Mode == 'Parallel':
 		OutList = [ "#! /bin/bash\n\n"]
 	elif Mode == 'Array':
-		OutList = ["#! /bin/bash\n#SBATCH -J concat_tree\n#SBATCH -t 72:00:00\n#SBATCH -n 1\n#SBATCH --mem=32GB\nmodule load raxml\n"] 
+		OutList = ["#! /bin/bash\n#SBATCH -J "+OutFilePre+"concat_tree\n#SBATCH -t 72:00:00\n#SBATCH -n 1\n#SBATCH --mem=32GB\nmodule load raxml\n"] 
 	Line = ScriptFolder+"fasta_to_phylip.py "+OutFileName+"\n"
 	Line += "rm "+OutFolder+"RAxML_*."+OutFilePre+"combined_"+str(len(GoodInds))+"inds_"+str(len(GoodSeqs))+"seqs\n"
 	if OutMode == "combined":
@@ -554,7 +560,7 @@ elif OutMode == 'separatemb':
 	elif Mode == 'Array':
 		NumLoci = 0
 		LocusGroup = 1
-		OutScript = ["#! /bin/bash\n#SBATCH -J "+str(LocusGroup)+"_mb_genetrees\n#SBATCH -t 48:00:00\n#SBATCH -n 1\nmodule load mrbayes\ncd "+OutFolder+"\n"]
+		OutScript = ["#! /bin/bash\n#SBATCH -J "+OutFilePre+str(LocusGroup)+"_mb_genetrees\n#SBATCH -t 48:00:00\n#SBATCH -n 1\nmodule load mrbayes\ncd "+OutFolder+"\n"]
 		OutScriptName = OutFolder+OutFilePre+"Grp_"+str(LocusGroup)+"_mb_script.sh"
 		for Locus in GoodSeqs:
 			NumLoci += 1
@@ -593,7 +599,7 @@ elif OutMode == 'separatemb':
 				SBatchOut = subprocess.Popen(OutLine, shell=True, stdout=subprocess.PIPE).communicate()[0]
 				LocusGroup += 1
 				NumLoci = 0
-				OutScript = ["#! /bin/bash\n#SBATCH -J "+str(LocusGroup)+"_mb_genetrees\n#SBATCH -t 48:00:00\n#SBATCH -n 1\nmodule load mrbayes\ncd "+OutFolder+"\n"]
+				OutScript = ["#! /bin/bash\n#SBATCH -J "+OutFilePre+str(LocusGroup)+"_mb_genetrees\n#SBATCH -t 48:00:00\n#SBATCH -n 1\nmodule load mrbayes\ncd "+OutFolder+"\n"]
 				OutScriptName = OutFolder+OutFilePre+"Grp_"+str(LocusGroup)+"_mb_script.sh"
 		if NumLoci != 0:
 			OutFileWriting(OutScriptName, OutScript)
@@ -665,7 +671,7 @@ elif OutMode == 'separate':
 		NumLoci = 0
 		LocusGroup = 1
 		SBatchList = [ ]
-		OutScript = ["#! /bin/bash\n#SBATCH -J "+str(LocusGroup)+"_genetrees\n#SBATCH -t 10:00:00\n#SBATCH -n 1\nmodule load raxml\n"]
+		OutScript = ["#! /bin/bash\n#SBATCH -J "+OutFilePre+str(LocusGroup)+"_genetrees\n#SBATCH -t 10:00:00\n#SBATCH -n 1\nmodule load raxml\n"]
 		OutScriptName = OutFolder+OutFilePre+"Grp_"+str(LocusGroup)+"_script.sh"
 		for Locus in GoodSeqs:
 			print Locus
@@ -711,7 +717,7 @@ elif OutMode == 'separate':
 				SBatchList.append(JobIDPrev)
 				LocusGroup += 1
 				NumLoci = 0
-				OutScript = ["#! /bin/bash\n#SBATCH -J "+str(LocusGroup)+"_genetrees\n#SBATCH -t 6:00:00\n#SBATCH -n 1\n\nmodule load raxml\n"]
+				OutScript = ["#! /bin/bash\n#SBATCH -J "+OutFilePre+str(LocusGroup)+"_genetrees\n#SBATCH -t 6:00:00\n#SBATCH -n 1\n\nmodule load raxml\n"]
 				OutScriptName = OutFolder+OutFilePre+"Grp_"+str(LocusGroup)+"_script.sh"
 		if NumLoci != 0:
 			OutFileWriting(OutScriptName, OutScript)
@@ -723,7 +729,7 @@ elif OutMode == 'separate':
 		sys.stderr.write("%d sequence files were written, with names such as %s.\n" % (len(GoodSeqs), OutFileName))
 		print("And %d batch scripts were submitted to analyze these loci with raxml.\n" % (LocusGroup))
 		sys.stderr.write("And %d batch scripts were submitted to analyze these loci with raxml.\n" % (LocusGroup))
-		OutScript = ["#! /bin/bash\n#SBATCH -J combining_genetrees\n#SBATCH -t 1:00:00\n#SBATCH -n 1\n\n"]
+		OutScript = ["#! /bin/bash\n#SBATCH -J "+OutFilePre+"combining_genetrees\n#SBATCH -t 1:00:00\n#SBATCH -n 1\n\n"]
 		Line = "mkdir "+OutFolder+OutFilePre+"raxmlbs\ncp "+OutFolder+"RAxML_bootstrap."+OutFilePre+"* "+OutFolder+OutFilePre+"raxmlbs\n"
 		Line += "cd "+OutFolder+OutFilePre+"raxmlbs\nls RAxML_bootstrap.* > bootstrap_filelist.txt\n"
 		Line += "cat "+OutFolder+"RAxML_bestTree."+OutFilePre+"* > "+OutFolder+OutFilePre+"raxmlbs/"+OutFilePre+"bestTrees.tre\n"

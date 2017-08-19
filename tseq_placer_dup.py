@@ -92,6 +92,9 @@ GrpFate = sys.argv[14]
 if (GrpFate in GrpFateList) == False:
 	sys.exit("ERROR!  The fate of the groups can be %s, but you wrote %s.\n %s" % (", ".join(GrpFateList), GrpFate, Usage))
 
+Verbose = "no"
+#Verbose = "yes"
+
 
 #CaptureColumn makes a list from a specified column in a file.  This is useful
 #for reusing various text files that previous programs needed.
@@ -202,8 +205,8 @@ def NodeCompare(BackTree, NumDict, FileName, LCDict, COVal):
 		if PVal >= COVal:
 			DictTemp[SeqName].append(NodeNum)
 	SeqListTemp = list(set(SeqListTemp))
-	#if len(SeqListTemp) != len(DictTemp):
-		#print("Only %d of the %d contigs had positions supported by probabilities greater than the cutoff value of %.3f.  The remaining %d contigs will not be used.\n" % (len(DictTemp), len(SeqListTemp), COVal, len(SeqListTemp)-len(DictTemp)))
+	if len(SeqListTemp) != len(DictTemp):
+		if Verbose == "yes": print("Only %d of the %d contigs had positions supported by probabilities greater than the cutoff value of %.3f.  The remaining %d contigs will not be used.\n" % (len(DictTemp), len(SeqListTemp), COVal, len(SeqListTemp)-len(DictTemp)))
 		#sys.stderr.write("Only %d of the %d contigs had positions supported by probabilities greater than the cutoff value of %.3f.  The remaining %d contigs will not be used.\n" % (len(DictTemp), len(SeqListTemp), COVal, len(SeqListTemp)-len(DictTemp)))
 	GDictTemp = defaultdict(list) #GDictTemp[GroupNum] = list of Contigs
 	NDictTemp = { } #NDictTemp[NodeNum] = GroupNum
@@ -211,7 +214,7 @@ def NodeCompare(BackTree, NumDict, FileName, LCDict, COVal):
 	GroupNum = 1
 	for SeqName in DictTemp:
 		SeqLen = len(LCDict[SeqName])
-		#print ("%s: length: %d, groups: %s\n" % (SeqName, SeqLen, ", ".join(DictTemp[SeqName])))
+		if Verbose == "yes": print ("%s: length: %d, groups: %s\n" % (SeqName, SeqLen, ", ".join(DictTemp[SeqName])))
 		GroupListTemp = [ ]
 		for NodeNum in DictTemp[SeqName]:
 			try:
@@ -221,7 +224,7 @@ def NodeCompare(BackTree, NumDict, FileName, LCDict, COVal):
 		GroupListTemp = list(set(GroupListTemp))
 		#if only one group is represented in the nodes:
 		if len(GroupListTemp) == 1:
-			#print("Only group %d present." % (GroupListTemp[0]))
+			if Verbose == "yes": print("Only group %d present." % (GroupListTemp[0]))
 			#add this sequence to an existing group
 			NewGroup = GroupListTemp[0]
 			GDictTemp[NewGroup].append(SeqName)
@@ -233,14 +236,14 @@ def NodeCompare(BackTree, NumDict, FileName, LCDict, COVal):
 		#but if none of the nodes have a group yet
 		elif len(GroupListTemp) == 0:
 			#assign them the next group
-			#print("No groups found for this contig.  It will become Group %d." % (GroupNum))
+			if Verbose == "yes": print("No groups found for this contig.  It will become Group %d." % (GroupNum))
 			GDictTemp[GroupNum] = [SeqName]
 			for NodeNum in DictTemp[SeqName]:
 				NDictTemp[NodeNum] = GroupNum
 				NListDict[GroupNum].append(NodeNum)
 			GroupNum += 1
 		else:
-			#print("This contig had several groups: %s.  They will be combined under group %d." % (",".join([str(GN) for GN in GroupListTemp]), GroupListTemp[0])) 
+			if Verbose == "yes": print("This contig had several groups: %s.  They will be combined under group %d." % (",".join([str(GN) for GN in GroupListTemp]), GroupListTemp[0])) 
 			#arbitrarily choose the first group number
 			NewGroup = GroupListTemp[0]
 			NListDict[NewGroup] += DictTemp[SeqName]
@@ -363,54 +366,54 @@ def PosFinder(LList, Folder, FilePre, PDict, CDict):
 		#read the likelihood file and determine which nodes a sequence could potentially be located at
 		LikeFileName = Folder+"RAxML_classificationLikelihoodWeights."+FilePre+Locus
 		(GroupDict, NumGroupDict) = NodeCompare(Tree1, OTUNumDict, LikeFileName, CDict[Locus], CutOff)
-		#print("The contigs for locus %s were in %d groups.\n" % (Locus, len(NumGroupDict)))
+		if Verbose == "yes": print("The contigs for locus %s were in %d groups.\n" % (Locus, len(NumGroupDict)))
 		SisterGroupDict = defaultdict(list)
 		for GroupNum in NumGroupDict:
-			#print("Group %d contained %d contigs from the following nodes: %s.\n" % (GroupNum, len(GroupDict[GroupNum]), ", ".join(NumGroupDict[GroupNum])))
+			if Verbose == "yes": print("Group %d contained %d contigs from the following nodes: %s.\n" % (GroupNum, len(GroupDict[GroupNum]), ", ".join(NumGroupDict[GroupNum])))
 			for NodeNum in NumGroupDict[GroupNum]:
 				try:
 					SisterGroupDict[GroupNum].append(OTUNumDict[NodeNum])
-					#print ("%s: %s\n" % (NodeNum, OTUNumDict[NodeNum]))
+					if Verbose == "yes": print ("%s: %s\n" % (NodeNum, OTUNumDict[NodeNum]))
 				except KeyError:
 					node = Tree1.find_node_with_label(NodeNum)
 					ListTemp = [str(node2.taxon) for node2 in node.leaf_nodes()]
 					SisterGroupDict[GroupNum]+= ListTemp
-					#print ("%s: %s" % (NodeNum, ", ".join(ListTemp)))
+					if Verbose == "yes": print ("%s: %s" % (NodeNum, ", ".join(ListTemp)))
 			SisterGroupDict[GroupNum] = list(set(SisterGroupDict[GroupNum]))
 		#merging overlapping groups with overlapping sister groups, if desired
 		if GrpFate == "merge":
 			(GroupDict, SisterGroupDict) = GroupMerging(GroupDict, SisterGroupDict)
-			#print("After merging, the contigs for locus %s were in %d groups.\n" % (Locus, len(GroupDict)))
+			if Verbose == "yes": print("After merging, the contigs for locus %s were in %d groups.\n" % (Locus, len(GroupDict)))
 		#changing the names if two groups belong to the same paralog
 		for GroupNum in SisterGroupDict:
 			ParList = [ ]
 			for Sister in SisterGroupDict[GroupNum]:
 				try:
 					ParList.append(PDict[Locus][Sister])
-					#print("%s: %s\n" % (Sister, PDict[Locus][Sister]))
+					if Verbose == "yes": print("%s: %s\n" % (Sister, PDict[Locus][Sister]))
 				except KeyError:
 					"no paralogs for this sequence"
-					#print("%s: no paralogs listed\n" % (Sister))
+					if Verbose == "yes": print("%s: no paralogs listed\n" % (Sister))
 			ParList = list(set(ParList))
 			#Determining if a group of sequences can be classified according to paralog and naming it accordingly.
 			if len(ParList) == 0:
-				#print("None of the sister sequences were classified as to paralog.\n")
+				if Verbose == "yes": print("None of the sister sequences were classified as to paralog.\n")
 				ParNameTemp = "Ambig_"+Locus+"_none"
 			elif len(ParList) == 1:
-				#print("This group belongs to the paralog %s.\n" % (ParList[0]))
+				if Verbose == "yes": print("This group belongs to the paralog %s.\n" % (ParList[0]))
 				ParNameTemp = ParList[0]
 			elif len(ParList) == 2:
-				#print("This group could belong to either of two paralogs: %s or %s.\n" % (ParList[0], ParList[1]))
+				if Verbose == "yes": print("This group could belong to either of two paralogs: %s or %s.\n" % (ParList[0], ParList[1]))
 				ParNameTemp = "Ambig_"+Locus+"_"+"_".join(ParList)
 			elif len(ParList) > 2:
-				#print("It is not clear which of the following paralogs this group belongs to: %s.\n" % (", ".join(ParList)))
+				if Verbose == "yes": print("It is not clear which of the following paralogs this group belongs to: %s.\n" % (", ".join(ParList)))
 				ParNameTemp = "Ambig_"+Locus+"_"+str(len(ParList))
 			LPDict[ParNameTemp].append(GroupNum)
 			GNameDict[GroupNum] = ParNameTemp
-			#if len(GroupDict[GroupNum]) == 1:
-				#print("The contig is %s, with a length of %d.\n" % (GroupDict[GroupNum][0], len(CDict[Locus][GroupDict[GroupNum][0]])))
+			if len(GroupDict[GroupNum]) == 1:
+				if Verbose == "yes": print("The contig is %s, with a length of %d.\n" % (GroupDict[GroupNum][0], len(CDict[Locus][GroupDict[GroupNum][0]])))
 		for ParNameTemp in sorted(LPDict.keys()):
-			#print("%d groups were found for paralog %s.\n" % (len(LPDict[ParNameTemp]), ParNameTemp))
+			if Verbose == "yes": print("%d groups were found for paralog %s.\n" % (len(LPDict[ParNameTemp]), ParNameTemp))
 			if len(LPDict[ParNameTemp]) > 1:
 				#Then ParNameTemp is not enough of a name for those groups.  They need to get a number as well.
 				Num = 1

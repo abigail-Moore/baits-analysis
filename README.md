@@ -231,6 +231,9 @@ Other potentially useful scripts:
 alignment_combiner.py
 This script combines two alignments while keeping only one copy of duplicate sequences.  It can input or output any format that is recognized by Biopython.
 
+fasta_renaming.py
+This script specifically renames fasta files.  If there is a long list of names that need to be changed, it runs much faster than treerenamer.py.
+
 seqsorting.py
 This script sorts the sequences in an alignment alphabetically.  It can input or output any format that is recognized by Biopython.
 

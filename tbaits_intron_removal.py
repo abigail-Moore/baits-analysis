@@ -367,7 +367,7 @@ def SeqStatsWriter(SeqDict, Folder, Pre, Delimitter):
 	return
 		
 #MRScriptWriter writes an output script for analysis of the sequences using mafft and raxml
-def MRScriptWriter(SeqFileDict, Folder, Prefix, AFolder, APre, APost, Path):
+def MRScriptWriter(SeqFileDict, Folder, Prefix, OGDict, AFolder, APre, APost, Path):
 	for LocusGroup in SeqFileDict:
 		OutList = [ ]
 		OutLocusList = [ ]
@@ -403,7 +403,7 @@ def MRScriptWriter(SeqFileDict, Folder, Prefix, AFolder, APre, APost, Path):
 #Read the BlastFileList and the LocusKeyFile and make dictionaries from them:
 LocusDict = DictFromFile(LocusKeyFile)
 LocusList = ListFromDictValues(LocusDict)
-OGDict = DictFromFile(OGFileName)
+OutGroupDict = DictFromFile(OGFileName)
 SeqFileList = [SeqFilePre+Locus+".fa" for Locus in LocusList]
 BlastFileList = [BlastFilePre+Locus+".out" for Locus in LocusList]
 
@@ -430,4 +430,4 @@ SeqStatsWriter(OutDict, OutFolder, OutFilePre, "-")
 #Write sequence files and shell scripts
 
 FileDict = LocusGroupSeqWriter(OutDict, OutFolder, OutFilePre, '.fa', "_exons", 'fasta')
-MRScriptWriter(FileDict, OutFolder, OutFilePre, AlFolder, AlFilePre, AlFilePost, FilePath)
+MRScriptWriter(FileDict, OutFolder, OutFilePre, OutGroupDict, AlFolder, AlFilePre, AlFilePost, FilePath)
